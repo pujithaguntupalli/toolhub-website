@@ -1,0 +1,1 @@
+- [Multi-Toolbox privacy boundary](multi-toolbox-privacy.md) — process files locally; no paid APIs or third-party file uploads without explicit permission.
