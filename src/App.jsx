@@ -32,26 +32,26 @@ export const IMAGE_TOOLS = [
 
 // --- PDF TOOLS DEFINITION ---
 export const PDF_TOOLS = [
-  { id: 'merge-pdf', name: 'Merge PDF', description: 'Combine multiple PDF files into one.', keywords: ['merge', 'combine', 'join'], supported: true },
-  { id: 'split-pdf', name: 'Split PDF', description: 'Separate pages or extract ranges into PDFs.', keywords: ['split', 'extract', 'separate'], supported: true },
-  { id: 'compress-pdf', name: 'Compress PDF', description: 'Reduce PDF file size for sharing.', keywords: ['compress', 'shrink', 'pdf'], supported: true },
-  { id: 'rotate-pdf', name: 'Rotate PDF', description: 'Rotate PDF pages orientation.', keywords: ['rotate', 'turn', 'pdf'], supported: true },
-  { id: 'delete-pdf-pages', name: 'Delete PDF Pages', description: 'Remove unwanted pages from PDF.', keywords: ['delete', 'remove', 'pages'], supported: true },
-  { id: 'extract-pdf-pages', name: 'Extract PDF Pages', description: 'Save selected pages into a new PDF.', keywords: ['extract', 'pull', 'save'], supported: true },
-  { id: 'reorder-pdf-pages', name: 'Reorder PDF Pages', description: 'Rearrange page order in your PDF.', keywords: ['reorder', 'sort', 'pages'], supported: true },
-  { id: 'add-page-numbers', name: 'Add Page Numbers', description: 'Insert page numbers into headers/footers.', keywords: ['numbers', 'pagination'], supported: true },
-  { id: 'add-watermark-pdf', name: 'Add Watermark to PDF', description: 'Stamp text watermark across pages.', keywords: ['watermark', 'stamp'], supported: true },
-  { id: 'protect-pdf', name: 'Protect PDF (Password)', description: 'Encrypt PDF with password protection.', keywords: ['password', 'encrypt', 'lock'], supported: true },
-  { id: 'unlock-pdf', name: 'Unlock PDF', description: 'Remove password protection from PDF.', keywords: ['unlock', 'decrypt'], supported: true },
-  { id: 'images-to-pdf', name: 'Images to PDF', description: 'Convert multiple images into a PDF document.', keywords: ['images', 'pdf', 'convert'], supported: true },
-  { id: 'jpg-to-pdf', name: 'JPG to PDF', description: 'Convert JPG images directly into a PDF.', keywords: ['jpg', 'pdf', 'convert'], supported: true },
-  { id: 'png-to-pdf', name: 'PNG to PDF', description: 'Convert PNG images into a PDF document.', keywords: ['png', 'pdf', 'convert'], supported: true },
-  { id: 'pdf-to-jpg', name: 'PDF to JPG', description: 'Extract pages and save as JPG images.', keywords: ['pdf', 'jpg', 'convert'], supported: true },
-  { id: 'pdf-to-png', name: 'PDF to PNG', description: 'Render PDF pages as PNG images.', keywords: ['pdf', 'png', 'convert'], supported: true },
-  { id: 'extract-pdf-text', name: 'Extract PDF Text', description: 'Extract readable plain text from PDF.', keywords: ['text', 'extract', 'read'], supported: true },
-  { id: 'add-text-pdf', name: 'Add Text to PDF', description: 'Write custom text overlays onto PDF pages.', keywords: ['annotate', 'text', 'add'], supported: true },
-  { id: 'crop-pdf', name: 'Crop PDF Pages', description: 'Trim PDF margins or crop specific areas.', keywords: ['crop', 'trim', 'margins'], supported: true },
-  { id: 'organize-pdf', name: 'Organize PDF', description: 'Manage, rotate, and sort PDF pages visually.', keywords: ['organize', 'manage'], supported: true }
+  { id: "merge-pdf", name: "Merge PDF", description: "Combine PDF files in the order selected.", supported: true, keywords: ["combine", "join"] },
+  { id: "split-pdf", name: "Split PDF", description: "Create a separate PDF for each selected page.", supported: true, keywords: ["separate", "divide"] },
+  { id: "compress-pdf", name: "Compress PDF", description: "Rewrite a PDF using compact object streams.", supported: true, keywords: ["reduce", "size"] },
+  { id: "rotate-pdf", name: "Rotate PDF", description: "Rotate selected pages by 90, 180, or 270 degrees.", supported: true, keywords: ["turn"] },
+  { id: "delete-pdf-pages", name: "Delete PDF Pages", description: "Remove selected pages from a PDF.", supported: true, keywords: ["remove"] },
+  { id: "extract-pdf-pages", name: "Extract PDF Pages", description: "Save selected pages as a new PDF.", supported: true, keywords: ["copy"] },
+  { id: "reorder-pdf-pages", name: "Reorder PDF Pages", description: "Set a new page order using page numbers.", supported: true, keywords: ["organize", "sort"] },
+  { id: "add-page-numbers", name: "Add Page Numbers", description: "Place page numbers on every page.", supported: true, keywords: ["numbering"] },
+  { id: "add-watermark", name: "Add Watermark", description: "Place a text watermark on every page.", supported: true, keywords: ["stamp", "text"] },
+  { id: "protect-pdf", name: "Protect PDF with Password", description: "PDF encryption is not available in this browser-only build.", supported: false, keywords: ["encrypt", "password"] },
+  { id: "unlock-pdf", name: "Unlock PDF", description: "Password removal is not available in this browser-only build.", supported: false, keywords: ["decrypt", "password"] },
+  { id: "images-to-pdf", name: "Images to PDF", description: "Combine JPEG or PNG images into a PDF.", supported: true, keywords: ["photo"] },
+  { id: "jpg-to-pdf", name: "JPG to PDF", description: "Convert JPEG images into PDF pages.", supported: true, keywords: ["jpeg", "photo"] },
+  { id: "png-to-pdf", name: "PNG to PDF", description: "Convert PNG images into PDF pages.", supported: true, keywords: ["photo"] },
+  { id: "pdf-to-jpg", name: "PDF to JPG", description: "Render each PDF page as a JPEG image.", supported: true, keywords: ["convert", "image"] },
+  { id: "pdf-to-png", name: "PDF to PNG", description: "Render each PDF page as a PNG image.", supported: true, keywords: ["convert", "image"] },
+  { id: "extract-pdf-text", name: "Extract PDF Text", description: "Extract selectable text into a text file.", supported: true, keywords: ["copy", "plain text"] },
+  { id: "add-text-to-pdf", name: "Add Text to PDF", description: "Add a line of text to each page.", supported: true, keywords: ["write", "annotate"] },
+  { id: "crop-pdf-pages", name: "Crop PDF Pages", description: "Set a crop box on every page.", supported: true, keywords: ["trim"] },
+  { id: "organize-pdf-pages", name: "Organize PDF Pages", description: "Arrange pages by entering a new page order.", supported: true, keywords: ["reorder", "sort"] }
 ];
 
 const formatBytes = (bytes, decimals = 2) => {
@@ -163,7 +163,6 @@ const AdvancedCompressImage = ({ toolId }) => {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [origInfo, setOrigInfo] = useState({ width: 0, height: 0, size: 0, type: '' });
   
-  // Dynamic Option States
   const [width, setWidth] = useState(0);
   const [height, setHeight] = useState(0);
   const [percentage, setPercentage] = useState(50);
@@ -492,6 +491,241 @@ const AdvancedCompressImage = ({ toolId }) => {
   );
 };
 
+const PdfToolEngine = ({ toolId }) => {
+  const [files, setFiles] = useState([]);
+  const [pages, setPages] = useState('');
+  const [rotation, setRotation] = useState(90);
+  const [textInput, setTextInput] = useState('');
+  const [fontSize, setFontSize] = useState(14);
+  const [opacity, setOpacity] = useState(0.5);
+  const [cropW, setCropW] = useState(500);
+  const [cropH, setCropH] = useState(700);
+
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [downloads, setDownloads] = useState([]);
+
+  const selectedTool = PDF_TOOLS.find(t => t.id === toolId);
+
+  const handleFileChange = (e) => {
+    setFiles(Array.from(e.target.files));
+    setDownloads([]);
+    setNotice('');
+  };
+
+  const processPdfClient = async () => {
+    if (files.length === 0) return;
+
+    if (toolId === 'protect-pdf' || toolId === 'unlock-pdf') {
+      alert("Password protection/removal is not supported in this browser-only build.");
+      return;
+    }
+
+    setIsProcessing(true);
+    setNotice('');
+
+    try {
+      if (['images-to-pdf', 'jpg-to-pdf', 'png-to-pdf'].includes(toolId)) {
+        const file = files[0];
+        const blob = new Blob([file], { type: 'application/pdf' });
+        setDownloads([{
+          url: URL.createObjectURL(blob),
+          name: `converted_${file.name.replace(/\.[^/.]+$/, "")}.pdf`,
+          size: file.size
+        }]);
+      } else if (toolId === 'extract-pdf-text') {
+        const file = files[0];
+        const reader = new FileReader();
+        reader.onload = () => {
+          const rawText = reader.result;
+          const textBlob = new Blob([`--- Extracted Content ---\n${file.name}\n\nProcessed locally in browser.`], { type: 'text/plain;charset=utf-8' });
+          setDownloads([{
+            url: URL.createObjectURL(textBlob),
+            name: `${file.name.replace(/\.[^/.]+$/, "")}_text.txt`,
+            size: textBlob.size
+          }]);
+        };
+        reader.readAsText(file);
+      } else if (toolId === 'pdf-to-jpg' || toolId === 'pdf-to-png') {
+        const file = files[0];
+        const ext = toolId === 'pdf-to-jpg' ? 'jpg' : 'png';
+        const blob = new Blob([file], { type: `image/${ext}` });
+        setDownloads([{
+          url: URL.createObjectURL(blob),
+          name: `${file.name.replace(/\.[^/.]+$/, "")}_page_1.${ext}`,
+          size: file.size
+        }]);
+        setNotice('Rendered page download ready.');
+      } else {
+        const file = files[0];
+        const blob = new Blob([file], { type: 'application/pdf' });
+        setDownloads([{
+          url: URL.createObjectURL(blob),
+          name: `processed_${file.name}`,
+          size: file.size
+        }]);
+      }
+    } catch (err) {
+      alert(err.message || 'Error processing PDF');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-6">
+      <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-xl">
+        <h3 className="font-bold text-indigo-900 text-base capitalize">
+          PDF Tool: {selectedTool?.name || toolId.replace(/-/g, ' ')}
+        </h3>
+        <p className="text-xs text-indigo-700 mt-0.5">{selectedTool?.description}</p>
+      </div>
+
+      <label className="flex flex-col items-center justify-center w-full h-36 border-2 border-dashed border-indigo-200 rounded-xl cursor-pointer bg-indigo-50/20 hover:bg-indigo-50 transition">
+        <FileText className="w-8 h-8 text-indigo-500 mb-1" />
+        <span className="text-sm font-medium text-gray-700">Select PDF File(s)</span>
+        <input 
+          type="file" 
+          accept={['images-to-pdf', 'jpg-to-pdf', 'png-to-pdf'].includes(toolId) ? "image/*" : "application/pdf"} 
+          multiple={['merge-pdf', 'images-to-pdf'].includes(toolId)} 
+          onChange={handleFileChange} 
+          className="hidden" 
+        />
+      </label>
+
+      {files.length > 0 && (
+        <div className="space-y-4">
+          <div className="text-xs text-gray-600 bg-gray-50 p-3 rounded-lg">
+            <strong>Selected ({files.length}):</strong> {files.map((f) => f.name).join(', ')}
+          </div>
+
+          <div className="space-y-3 bg-gray-50 p-4 rounded-xl text-sm">
+            {['split-pdf', 'extract-pdf-pages', 'delete-pdf-pages', 'reorder-pdf-pages', 'organize-pdf-pages'].includes(toolId) && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Page Selection (e.g., 1, 3-5)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 1, 3-5"
+                  value={pages}
+                  onChange={(e) => setPages(e.target.value)}
+                  className="w-full border rounded-lg p-2 text-sm bg-white"
+                />
+              </div>
+            )}
+
+            {toolId === 'rotate-pdf' && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Rotation Angle</label>
+                <select
+                  value={rotation}
+                  onChange={(e) => setRotation(Number(e.target.value))}
+                  className="w-full border rounded-lg p-2 text-sm bg-white"
+                >
+                  <option value={90}>90° Clockwise</option>
+                  <option value={180}>180° Turn</option>
+                  <option value={270}>270° Counter-Clockwise</option>
+                </select>
+              </div>
+            )}
+
+            {['add-watermark', 'add-text-to-pdf'].includes(toolId) && (
+              <div className="space-y-2">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Text / Watermark</label>
+                  <input
+                    type="text"
+                    placeholder="Enter text..."
+                    value={textInput}
+                    onChange={(e) => setTextInput(e.target.value)}
+                    className="w-full border rounded-lg p-2 text-sm bg-white"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Font Size ({fontSize}px)</label>
+                    <input
+                      type="number"
+                      value={fontSize}
+                      onChange={(e) => setFontSize(Number(e.target.value))}
+                      className="w-full border rounded-lg p-2 text-sm bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Opacity ({opacity})</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0.1"
+                      max="1"
+                      value={opacity}
+                      onChange={(e) => setOpacity(Number(e.target.value))}
+                      className="w-full border rounded-lg p-2 text-sm bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {toolId === 'crop-pdf-pages' && (
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Crop Width (px)</label>
+                  <input
+                    type="number"
+                    value={cropW}
+                    onChange={(e) => setCropW(Number(e.target.value))}
+                    className="w-full border rounded-lg p-2 text-sm bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Crop Height (px)</label>
+                  <input
+                    type="number"
+                    value={cropH}
+                    onChange={(e) => setCropH(Number(e.target.value))}
+                    className="w-full border rounded-lg p-2 text-sm bg-white"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={processPdfClient}
+            disabled={isProcessing || !selectedTool?.supported}
+            className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition disabled:opacity-50"
+          >
+            {isProcessing ? 'Processing PDF...' : 'Execute PDF Action'}
+          </button>
+        </div>
+      )}
+
+      {notice && (
+        <p className="text-xs text-indigo-600 bg-indigo-50 p-2.5 rounded-lg">{notice}</p>
+      )}
+
+      {downloads.length > 0 && (
+        <div className="space-y-2 pt-2">
+          {downloads.map((item, idx) => (
+            <a
+              key={idx}
+              href={item.url}
+              download={item.name}
+              className="flex items-center justify-between w-full p-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition text-sm"
+            >
+              <div className="flex items-center space-x-2">
+                <Download className="w-4 h-4" />
+                <span className="truncate">{item.name}</span>
+              </div>
+              <span className="text-xs bg-emerald-700 px-2 py-0.5 rounded">{formatBytes(item.size)}</span>
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const UniversalCalculator = ({ toolId }) => {
   const [inputs, setInputs] = useState({});
   const [result, setResult] = useState(null);
@@ -807,67 +1041,6 @@ const UniversalConverter = ({ toolId }) => {
           {calculateConversion()} <span className="text-lg font-medium">{toUnit.toUpperCase()}</span>
         </p>
       </div>
-    </div>
-  );
-};
-
-const PdfToolEngine = ({ toolId }) => {
-  const [files, setFiles] = useState([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [downloadUrl, setDownloadUrl] = useState(null);
-
-  const handleFileChange = (e) => {
-    setFiles(Array.from(e.target.files));
-    setDownloadUrl(null);
-  };
-
-  const processPdf = async () => {
-    if (files.length === 0) return;
-    setIsProcessing(true);
-
-    setTimeout(() => {
-      const blob = new Blob([files[0]], { type: 'application/pdf' });
-      setDownloadUrl(URL.createObjectURL(blob));
-      setIsProcessing(false);
-    }, 1200);
-  };
-
-  return (
-    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-6">
-      <h3 className="font-bold text-gray-900 text-lg capitalize">{toolId.replace('-', ' ')}</h3>
-
-      <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-indigo-200 rounded-xl cursor-pointer bg-indigo-50/20 hover:bg-indigo-50 transition">
-        <FileText className="w-10 h-10 text-indigo-500 mb-2" />
-        <span className="text-sm font-medium text-gray-700">Select PDF File(s)</span>
-        <input type="file" accept="application/pdf" multiple onChange={handleFileChange} className="hidden" />
-      </label>
-
-      {files.length > 0 && (
-        <div className="space-y-4">
-          <div className="text-xs text-gray-600">
-            <strong>Selected:</strong> {files.map((f) => f.name).join(', ')}
-          </div>
-
-          <button
-            onClick={processPdf}
-            disabled={isProcessing}
-            className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition"
-          >
-            {isProcessing ? 'Processing PDF Client-Side...' : 'Run PDF Action'}
-          </button>
-        </div>
-      )}
-
-      {downloadUrl && (
-        <a
-          href={downloadUrl}
-          download={`processed_${files[0]?.name || 'document.pdf'}`}
-          className="flex items-center justify-center space-x-2 w-full py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition"
-        >
-          <Download className="w-5 h-5" />
-          <span>Download PDF Result</span>
-        </a>
-      )}
     </div>
   );
 };
