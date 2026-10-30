@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { PDFDocument, StandardFonts, degrees, rgb } from 'pdf-lib';
 import { 
   Search, Calculator, ArrowRightLeft, FileText, Image as ImageIcon, 
   Download, Upload, Trash2, RotateCw, Sparkles, AlertCircle, ChevronRight,
@@ -498,14 +499,12 @@ const PdfToolEngine = ({ toolId }) => {
   const [textInput, setTextInput] = useState('');
   const [fontSize, setFontSize] = useState(14);
   const [opacity, setOpacity] = useState(0.5);
-  const [cropW, setCropW] = useState(500);
-  const [cropH, setCropH] = useState(700);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [notice, setNotice] = useState('');
   const [downloads, setDownloads] = useState([]);
 
-  const selectedTool = PDF_TOOLS.find(t => t.id === toolId);
+  const selectedTool = PDF_TOOLS.find((t) => t.id === toolId);
 
   const handleFileChange = (e) => {
     setFiles(Array.from(e.target.files));
@@ -516,8 +515,13 @@ const PdfToolEngine = ({ toolId }) => {
   const processPdfClient = async () => {
     if (files.length === 0) return;
 
+    if (toolId === 'merge-pdf' && files.length < 2) {
+      alert("Please select at least 2 PDF files to merge.");
+      return;
+    }
+
     if (toolId === 'protect-pdf' || toolId === 'unlock-pdf') {
-      alert("Password protection/removal is not supported in this browser-only build.");
+      alert("Password protection/removal is not available in this browser-only build.");
       return;
     }
 
@@ -525,37 +529,108 @@ const PdfToolEngine = ({ toolId }) => {
     setNotice('');
 
     try {
-      if (['images-to-pdf', 'jpg-to-pdf', 'png-to-pdf'].includes(toolId)) {
-        const file = files[0];
-        const blob = new Blob([file], { type: 'application/pdf' });
+      if (toolId === 'merge-pdf') {
+        const merged = await PDFDocument.create();
+        for (const file of files) {
+          const bytes = await file.arrayBuffer();
+          const doc = await PDFDocument.load(bytes);
+          const copiedPages = await merged.copyPages(doc, doc.getPageIndices());
+          copiedPages.forEach((page) => merged.addPage(page));
+        }
+        const mergedBytes = await merged.save({ useObjectStreams: true });
+        const blob = new Blob([mergedBytes], { type: 'application/pdf' });
+        
         setDownloads([{
           url: URL.createObjectURL(blob),
-          name: `converted_${file.name.replace(/\.[^/.]+$/, "")}.pdf`,
-          size: file.size
+          name: `merged_document.pdf`,
+          size: blob.size
         }]);
-      } else if (toolId === 'extract-pdf-text') {
-        const file = files[0];
-        const reader = new FileReader();
-        reader.onload = () => {
-          const rawText = reader.result;
-          const textBlob = new Blob([`--- Extracted Content ---\n${file.name}\n\nProcessed locally in browser.`], { type: 'text/plain;charset=utf-8' });
-          setDownloads([{
-            url: URL.createObjectURL(textBlob),
-            name: `${file.name.replace(/\.[^/.]+$/, "")}_text.txt`,
-            size: textBlob.size
-          }]);
-        };
-        reader.readAsText(file);
-      } else if (toolId === 'pdf-to-jpg' || toolId === 'pdf-to-png') {
-        const file = files[0];
-        const ext = toolId === 'pdf-to-jpg' ? 'jpg' : 'png';
-        const blob = new Blob([file], { type: `image/${ext}` });
+        setNotice(`Successfully merged ${files.length} PDF files (${merged.getPageCount()} total pages).`);
+      } else if (['images-to-pdf', 'jpg-to-pdf', 'png-to-pdf'].includes(toolId)) {
+        const output = await PDFDocument.create();
+        for (const file of files) {
+          const bytes = await file.arrayBuffer();
+          const image = (file.type === 'image/jpeg' || toolId === 'jpg-to-pdf')
+            ? await output.embedJpg(bytes)
+            : await output.embedPng(bytes);
+          const page = output.addPage([image.width, image.height]);
+          page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+        }
+        const pdfBytes = await output.save();
+        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+        
         setDownloads([{
           url: URL.createObjectURL(blob),
-          name: `${file.name.replace(/\.[^/.]+$/, "")}_page_1.${ext}`,
-          size: file.size
+          name: `converted_images.pdf`,
+          size: blob.size
         }]);
-        setNotice('Rendered page download ready.');
+      } else if (toolId === 'rotate-pdf') {
+        const file = files[0];
+        const doc = await PDFDocument.load(await file.arrayBuffer());
+        doc.getPages().forEach((page) => {
+          page.setRotation(degrees((page.getRotation().angle + rotation) % 360));
+        });
+        const bytes = await doc.save();
+        const blob = new Blob([bytes], { type: 'application/pdf' });
+        
+        setDownloads([{
+          url: URL.createObjectURL(blob),
+          name: `rotated_${file.name}`,
+          size: blob.size
+        }]);
+      } else if (toolId === 'add-page-numbers') {
+        const file = files[0];
+        const doc = await PDFDocument.load(await file.arrayBuffer());
+        const font = await doc.embedFont(StandardFonts.Helvetica);
+        doc.getPages().forEach((page, index) => {
+          const { width } = page.getSize();
+          page.drawText(String(index + 1), {
+            x: width / 2 - 5,
+            y: 18,
+            size: fontSize || 10,
+            font,
+            color: rgb(0.16, 0.2, 0.25)
+          });
+        });
+        const bytes = await doc.save();
+        const blob = new Blob([bytes], { type: 'application/pdf' });
+        
+        setDownloads([{
+          url: URL.createObjectURL(blob),
+          name: `numbered_${file.name}`,
+          size: blob.size
+        }]);
+      } else if (toolId === 'add-watermark' || toolId === 'add-text-to-pdf') {
+        if (!textInput.trim()) {
+          alert("Please enter the watermark text.");
+          setIsProcessing(false);
+          return;
+        }
+        const file = files[0];
+        const doc = await PDFDocument.load(await file.arrayBuffer());
+        const font = await doc.embedFont(StandardFonts.Helvetica);
+        
+        for (const page of doc.getPages()) {
+          const { width, height } = page.getSize();
+          const textWidth = font.widthOfTextAtSize(textInput, fontSize || 24);
+          page.drawText(textInput, {
+            x: Math.max(12, (width - textWidth) / 2),
+            y: toolId === 'add-watermark' ? height / 2 : 36,
+            size: fontSize || 24,
+            font,
+            color: rgb(0.18, 0.2, 0.24),
+            opacity: opacity || 0.3,
+            rotate: degrees(toolId === 'add-watermark' ? -35 : 0)
+          });
+        }
+        const bytes = await doc.save();
+        const blob = new Blob([bytes], { type: 'application/pdf' });
+        
+        setDownloads([{
+          url: URL.createObjectURL(blob),
+          name: `watermarked_${file.name}`,
+          size: blob.size
+        }]);
       } else {
         const file = files[0];
         const blob = new Blob([file], { type: 'application/pdf' });
@@ -566,7 +641,7 @@ const PdfToolEngine = ({ toolId }) => {
         }]);
       }
     } catch (err) {
-      alert(err.message || 'Error processing PDF');
+      alert(err.message || 'Error processing PDF file.');
     } finally {
       setIsProcessing(false);
     }
@@ -583,11 +658,17 @@ const PdfToolEngine = ({ toolId }) => {
 
       <label className="flex flex-col items-center justify-center w-full h-36 border-2 border-dashed border-indigo-200 rounded-xl cursor-pointer bg-indigo-50/20 hover:bg-indigo-50 transition">
         <FileText className="w-8 h-8 text-indigo-500 mb-1" />
-        <span className="text-sm font-medium text-gray-700">Select PDF File(s)</span>
+        <span className="text-sm font-medium text-gray-700">
+          {toolId === 'merge-pdf'
+            ? 'Select 2 or More PDF Files'
+            : ['images-to-pdf', 'jpg-to-pdf', 'png-to-pdf'].includes(toolId)
+            ? 'Select Image Files'
+            : 'Select PDF File'}
+        </span>
         <input 
           type="file" 
           accept={['images-to-pdf', 'jpg-to-pdf', 'png-to-pdf'].includes(toolId) ? "image/*" : "application/pdf"} 
-          multiple={['merge-pdf', 'images-to-pdf'].includes(toolId)} 
+          multiple={['merge-pdf', 'images-to-pdf', 'jpg-to-pdf', 'png-to-pdf'].includes(toolId)} 
           onChange={handleFileChange} 
           className="hidden" 
         />
@@ -596,7 +677,12 @@ const PdfToolEngine = ({ toolId }) => {
       {files.length > 0 && (
         <div className="space-y-4">
           <div className="text-xs text-gray-600 bg-gray-50 p-3 rounded-lg">
-            <strong>Selected ({files.length}):</strong> {files.map((f) => f.name).join(', ')}
+            <strong>Selected ({files.length} file{files.length > 1 ? 's' : ''}):</strong>
+            <ul className="list-disc list-inside mt-1 space-y-0.5">
+              {files.map((f, i) => (
+                <li key={i} className="truncate">{f.name} ({formatBytes(f.size)})</li>
+              ))}
+            </ul>
           </div>
 
           <div className="space-y-3 bg-gray-50 p-4 rounded-xl text-sm">
@@ -631,7 +717,7 @@ const PdfToolEngine = ({ toolId }) => {
             {['add-watermark', 'add-text-to-pdf'].includes(toolId) && (
               <div className="space-y-2">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Text / Watermark</label>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Text / Watermark Content</label>
                   <input
                     type="text"
                     placeholder="Enter text..."
@@ -642,7 +728,7 @@ const PdfToolEngine = ({ toolId }) => {
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Font Size ({fontSize}px)</label>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Font Size (px)</label>
                     <input
                       type="number"
                       value={fontSize}
@@ -651,7 +737,7 @@ const PdfToolEngine = ({ toolId }) => {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Opacity ({opacity})</label>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Opacity (0.1 to 1.0)</label>
                     <input
                       type="number"
                       step="0.1"
@@ -662,29 +748,6 @@ const PdfToolEngine = ({ toolId }) => {
                       className="w-full border rounded-lg p-2 text-sm bg-white"
                     />
                   </div>
-                </div>
-              </div>
-            )}
-
-            {toolId === 'crop-pdf-pages' && (
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Crop Width (px)</label>
-                  <input
-                    type="number"
-                    value={cropW}
-                    onChange={(e) => setCropW(Number(e.target.value))}
-                    className="w-full border rounded-lg p-2 text-sm bg-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Crop Height (px)</label>
-                  <input
-                    type="number"
-                    value={cropH}
-                    onChange={(e) => setCropH(Number(e.target.value))}
-                    className="w-full border rounded-lg p-2 text-sm bg-white"
-                  />
                 </div>
               </div>
             )}
