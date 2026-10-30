@@ -108,7 +108,7 @@ const TOOLS = [
   { id: 'torque-conv', name: 'Torque Converter', category: 'converters', icon: 'Activity', desc: 'Convert Newton-meters, Foot-pounds, and Inch-pounds.', keywords: 'mechanic engine force rotation' },
   { id: 'number-system', name: 'Number System Converter', category: 'converters', icon: 'Cpu', desc: 'Convert Binary, Octal, Decimal, and Hexadecimal numbers.', keywords: 'hex bin oct dec programmer code' },
 
-  // --- IMAGE TOOLS (Mapped from IMAGE_TOOLS) ---
+  // --- IMAGE TOOLS ---
   ...IMAGE_TOOLS.map(t => ({
     id: t.id,
     name: t.name,
@@ -118,7 +118,7 @@ const TOOLS = [
     keywords: t.keywords.join(' ')
   })),
 
-  // --- PDF TOOLS (Mapped from PDF_TOOLS) ---
+  // --- PDF TOOLS ---
   ...PDF_TOOLS.map(t => ({
     id: t.id,
     name: t.name,
@@ -163,7 +163,7 @@ const AdvancedCompressImage = ({ toolId }) => {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [origInfo, setOrigInfo] = useState({ width: 0, height: 0, size: 0, type: '' });
   
-  // Controls & Options
+  // Dynamic Option States
   const [width, setWidth] = useState(0);
   const [height, setHeight] = useState(0);
   const [percentage, setPercentage] = useState(50);
