@@ -6,6 +6,72 @@ import {
   Database, Flame, HardDrive, Compass, Thermometer, Box, Scale, Shield, Maximize2, Crop
 } from 'lucide-react';
 
+// --- CONVERTER DATA & FORMULAS (from save.txt) ---
+const CONVERTER_DATA = [
+  ['length', 'Length', 'Convert distance and dimensions between metric and imperial units.', ['distance','meter','mile','inch','foot'], [['Millimeter',.001],['Centimeter',.01],['Meter',1],['Kilometer',1000],['Inch',.0254],['Foot',.3048],['Yard',.9144],['Mile',1609.344]]],
+  ['weight', 'Weight', 'Move between everyday mass and weight units.', ['mass','kilogram','pound','ounce'], [['Milligram',.000001],['Gram',.001],['Kilogram',1],['Metric tonne',1000],['Ounce',.028349523125],['Pound',.45359237],['Stone',6.35029318]]],
+  ['temperature', 'Temperature', 'Switch between Celsius, Fahrenheit and Kelvin scales.', ['celsius','fahrenheit','kelvin','degrees'], [['Celsius',1],['Fahrenheit',1],['Kelvin',1]]],
+  ['area', 'Area', 'Convert surface area for rooms, land and projects.', ['square','acre','hectare'], [['Square millimeter',.000001],['Square centimeter',.0001],['Square meter',1],['Square kilometer',1000000],['Square foot',.09290304],['Square yard',.83612736],['Acre',4046.8564224],['Hectare',10000]]],
+  ['volume', 'Volume', 'Convert liquid and cubic volume measurements.', ['liter','gallon','cup','fluid ounce'], [['Milliliter',.001],['Liter',1],['Cubic meter',1000],['US fluid ounce',.0295735296],['US cup',.2365882365],['US pint',.473176473],['US quart',.946352946],['US gallon',3.785411784],['Imperial gallon',4.54609]]],
+  ['time', 'Time', 'Translate intervals from milliseconds to years.', ['seconds','minutes','hours','days'], [['Millisecond',.001],['Second',1],['Minute',60],['Hour',3600],['Day',86400],['Week',604800],['Month (30 days)',2592000],['Year (365 days)',31536000]]],
+  ['speed', 'Speed', 'Convert travel speed across common units.', ['km/h','mph','knot','meters per second'], [['Meters per second',1],['Kilometers per hour',.2777777778],['Miles per hour',.44704],['Knot',.5144444444],['Feet per second',.3048]]],
+  ['pressure', 'Pressure', 'Convert pressure for weather, engineering and gauges.', ['pascal','bar','psi','atmosphere'], [['Pascal',1],['Kilopascal',1000],['Bar',100000],['Atmosphere',101325],['Torr',133.322368],['PSI',6894.757293]]],
+  ['energy', 'Energy', 'Convert energy and heat units.', ['joule','calorie','kilowatt hour','BTU'], [['Joule',1],['Kilojoule',1000],['Calorie (small)',4.184],['Kilocalorie',4184],['Watt-hour',3600],['Kilowatt-hour',3600000],['BTU',1055.05585262]]],
+  ['power', 'Power', 'Compare power ratings in watts, horsepower and more.', ['watt','horsepower'], [['Watt',1],['Kilowatt',1000],['Megawatt',1000000],['Mechanical horsepower',745.699872],['Metric horsepower',735.49875],['BTU per hour',.29307107]]],
+  ['data-storage', 'Data Storage', 'Convert decimal and binary data sizes, including bits and bytes.', ['data','byte','bit','gigabyte','gibibyte','storage'], [['Bit',1],['Byte',8],['Kilobit (kbit)',1000],['Kilobyte (kB)',8000],['Kibibyte (KiB)',8192],['Megabit (Mbit)',1000000],['Megabyte (MB)',8000000],['Mebibyte (MiB)',8388608],['Gigabit (Gbit)',1e9],['Gigabyte (GB)',8e9],['Gibibyte (GiB)',8589934592],['Terabyte (TB)',8e12],['Tebibyte (TiB)',8796093022208]]],
+  ['data-transfer-rate', 'Data Transfer Rate', 'Translate bandwidth between bits and bytes per second.', ['bandwidth','mbps','megabits','download','bytes per second'], [['Bit per second (bit/s)',1],['Kilobit per second (kbit/s)',1000],['Megabit per second (Mbit/s)',1e6],['Gigabit per second (Gbit/s)',1e9],['Byte per second (B/s)',8],['Kilobyte per second (kB/s)',8000],['Megabyte per second (MB/s)',8e6],['Kibibyte per second (KiB/s)',8192],['Mebibyte per second (MiB/s)',8388608]]],
+  ['angle', 'Angle', 'Convert degrees, radians, gradians and turns.', ['degrees','radians','turn'], [['Degree',1],['Radian',180/Math.PI],['Gradian',.9],['Turn',360],['Arcminute',1/60],['Arcsecond',1/3600]]],
+  ['fuel-economy', 'Fuel Economy', 'Compare fuel consumption and distance-per-fuel ratings.', ['mpg','miles per gallon','liters per 100 km','efficiency'], [['Kilometers per liter',1],['Miles per US gallon',.425143707],['Miles per Imperial gallon',.35400619],['Liters per 100 km',100]]],
+  ['frequency', 'Frequency', 'Convert cycles per second through radio frequencies.', ['hertz','khz','mhz','ghz'], [['Hertz',1],['Kilohertz',1000],['Megahertz',1e6],['Gigahertz',1e9],['Terahertz',1e12],['RPM',1/60]]],
+  ['force', 'Force', 'Convert force units used in mechanics and engineering.', ['newton','pound force','kgf'], [['Newton',1],['Kilonewton',1000],['Pound-force',4.4482216153],['Kilogram-force',9.80665],['Dyne',.00001]]],
+  ['density', 'Density', 'Convert density by mass per unit volume.', ['kg/m3','g/cm3','pounds per cubic foot'], [['Kilogram per cubic meter',1],['Gram per cubic centimeter',1000],['Gram per milliliter',1000],['Pound per cubic foot',16.01846337],['Pound per US gallon',119.826427]]],
+  ['cooking-measurement', 'Cooking Measurement', 'Scale common kitchen volume measures.', ['cooking','teaspoon','tablespoon','cup'], [['Milliliter',1],['Teaspoon (US)',4.92892159],['Tablespoon (US)',14.7867648],['Fluid ounce (US)',29.5735296],['Cup (US)',236.5882365],['Cup (metric)',250],['Pint (US)',473.176473],['Liter',1000]]],
+  ['torque', 'Torque', 'Convert turning force for tools and engineering.', ['newton meter','lb-ft','torque'], [['Newton meter',1],['Newton centimeter',.01],['Pound-foot',1.3558179483],['Pound-inch',.112984829],['Kilogram-force meter',9.80665]]],
+  ['number-system', 'Number System', 'Translate integers across binary, octal, decimal and hexadecimal.', ['binary','hex','octal','base','radix'], [['Binary (base 2)',2],['Octal (base 8)',8],['Decimal (base 10)',10],['Hexadecimal (base 16)',16]]],
+];
+
+const fmt = (n) => Number.isFinite(n) ? Number(n.toPrecision(11)).toLocaleString('en-US', { maximumFractionDigits: 8 }) : '—';
+const toTempBase = (n, unit) => unit === 'Celsius' ? n : unit === 'Fahrenheit' ? (n - 32) * 5 / 9 : n - 273.15;
+const fromTempBase = (c, unit) => unit === 'Celsius' ? c : unit === 'Fahrenheit' ? c * 9 / 5 + 32 : c + 273.15;
+
+function convertUnits(slug, amount, from, to) {
+  if (slug === 'temperature') {
+    const num = typeof amount === 'number' ? amount : parseFloat(amount);
+    if (!Number.isFinite(num)) return null;
+    const c = toTempBase(num, from);
+    if (c < -273.15) return null;
+    return fmt(fromTempBase(c, to));
+  }
+  if (slug === 'number-system') {
+    const radixFrom = from.startsWith('Binary') ? 2 : from.startsWith('Octal') ? 8 : from.startsWith('Hex') ? 16 : 10;
+    const radixTo = to.startsWith('Binary') ? 2 : to.startsWith('Octal') ? 8 : to.startsWith('Hex') ? 16 : 10;
+    const digits = String(amount).trim().replace(/^[-+]/, '');
+    const patterns = { 2: /^[01]+$/, 8: /^[0-7]+$/, 10: /^\d+$/, 16: /^[\da-f]+$/i };
+    if (!patterns[radixFrom]?.test(digits)) return null;
+    const integer = parseInt(String(amount), radixFrom);
+    return Number.isFinite(integer) ? integer.toString(radixTo).toUpperCase() : null;
+  }
+  const toolEntry = CONVERTER_DATA.find(([s]) => s === slug || `${s}-conv` === slug);
+  if (!toolEntry) return null;
+  const units = toolEntry[4];
+  const num = typeof amount === 'number' ? amount : parseFloat(amount);
+  if (!Number.isFinite(num)) return null;
+
+  if (slug === 'fuel-economy' && (from.includes('Liters per 100') || to.includes('Liters per 100'))) {
+    if (num <= 0) return null;
+    const uFrom = units.find(([l]) => l === from);
+    const kmPerLiter = from.includes('Liters per 100') ? 100 / num : num * (uFrom ? uFrom[1] : 1);
+    if (!Number.isFinite(kmPerLiter) || kmPerLiter <= 0) return null;
+    const uTo = units.find(([l]) => l === to);
+    return fmt(to.includes('Liters per 100') ? 100 / kmPerLiter : kmPerLiter / (uTo ? uTo[1] : 1));
+  }
+
+  const uFrom = units.find(([l]) => l === from);
+  const uTo = units.find(([l]) => l === to);
+  if (!uFrom || !uTo) return null;
+  return fmt(num * uFrom[1] / uTo[1]);
+}
+
 // --- IMAGE TOOLS DEFINITION ---
 export const IMAGE_TOOLS = [
   { id: 'compress-image', name: 'Compress Image', description: 'Reduce image file size while maintaining quality.', keywords: ['compress', 'jpg', 'png', 'webp', 'reduce size'] },
@@ -64,49 +130,39 @@ const formatBytes = (bytes, decimals = 2) => {
 };
 
 const TOOLS = [
-  // --- CALCULATORS (20) ---
-  { id: 'basic-calc', name: 'Basic Calculator', category: 'calculators', icon: 'Calculator', desc: 'Perform standard arithmetic operations with memory functions.', keywords: 'add math sum subtract multiply divide' },
-  { id: 'scientific-calc', name: 'Scientific Calculator', category: 'calculators', icon: 'Calculator', desc: 'Advanced math functions including trigonometry, logs, and exponents.', keywords: 'sin cos tan log sqrt pi exponent math' },
-  { id: 'percentage-calc', name: 'Percentage Calculator', category: 'calculators', icon: 'Percent', desc: 'Calculate percentages, percentage increases, and differences.', keywords: 'percent fraction ratio discount' },
-  { id: 'age-calc', name: 'Age Calculator', category: 'calculators', icon: 'Clock', desc: 'Find exact age in years, months, days, and total hours from birthdate.', keywords: 'dob birthday time living' },
-  { id: 'bmi-calc', name: 'BMI Calculator', category: 'calculators', icon: 'Activity', desc: 'Calculate Body Mass Index, health category, and ideal weight range.', keywords: 'health fitness weight height body fat' },
-  { id: 'simple-interest', name: 'Simple Interest Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Calculate interest earned or paid over a given period.', keywords: 'finance interest rate principal money' },
-  { id: 'compound-interest', name: 'Compound Interest Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Calculate investment growth with compounding frequencies.', keywords: 'savings wealth inflation compounding return' },
-  { id: 'loan-emi', name: 'Loan EMI Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Calculate monthly loan payment EMI, total interest, and schedule.', keywords: 'mortgage car loan finance bank monthly' },
-  { id: 'gst-calc', name: 'GST / Sales Tax Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Add or remove Goods and Services Tax (GST) from amounts.', keywords: 'tax sales vat price gross net' },
-  { id: 'discount-calc', name: 'Discount Calculator', category: 'calculators', icon: 'Percent', desc: 'Find final price after percentage or flat store discounts.', keywords: 'shopping savings price sale' },
-  { id: 'profit-loss', name: 'Profit and Loss Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Determine gross profit margin, markup, and net profit.', keywords: 'business sales revenue cost margin' },
-  { id: 'salary-calc', name: 'Salary / Wage Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Convert annual salary into monthly, weekly, or hourly rates.', keywords: 'pay income wage paystub job' },
-  { id: 'date-diff', name: 'Date Difference Calculator', category: 'calculators', icon: 'Clock', desc: 'Calculate days, weeks, and months between two selected dates.', keywords: 'time duration schedule calendar days' },
-  { id: 'time-duration', name: 'Time Duration Calculator', category: 'calculators', icon: 'Clock', desc: 'Add or subtract hours and minutes to find duration.', keywords: 'time log timer hours stopwatch' },
-  { id: 'average-calc', name: 'Average Calculator', category: 'calculators', icon: 'Calculator', desc: 'Calculate mean, median, mode, and range for a set of numbers.', keywords: 'mean median mode statistics range data' },
-  { id: 'ratio-calc', name: 'Ratio Calculator', category: 'calculators', icon: 'Calculator', desc: 'Solve ratio proportions and scale numbers proportionally.', keywords: 'proportion aspect scale divide math' },
-  { id: 'fraction-calc', name: 'Fraction Calculator', category: 'calculators', icon: 'Calculator', desc: 'Add, subtract, multiply, and simplify fractional values.', keywords: 'numerator denominator simplify math' },
-  { id: 'hcf-lcm', name: 'HCF and LCM Calculator', category: 'calculators', icon: 'Calculator', desc: 'Find Highest Common Factor (GCD) and Least Common Multiple.', keywords: 'gcd lcm prime factors divisor' },
-  { id: 'unit-price', name: 'Unit Price Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Compare cost per unit for store items to find best deals.', keywords: 'shopping grocery store compare cost' },
-  { id: 'savings-goal', name: 'Savings Goal Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Determine monthly savings needed to reach your target goal.', keywords: 'wealth plan goal deposit interest' },
+  // --- CONVERTERS (20) ---
+  ...CONVERTER_DATA.map(([slug, name, desc, keywords, units]) => ({
+    id: `${slug}-conv`,
+    rawSlug: slug,
+    name: `${name} Converter`,
+    category: 'converters',
+    icon: 'ArrowRightLeft',
+    desc,
+    keywords: keywords.join(' '),
+    units
+  })),
 
-  // --- UNIT CONVERTERS (20) ---
-  { id: 'length-conv', name: 'Length Converter', category: 'converters', icon: 'ArrowRightLeft', desc: 'Convert meters, feet, inches, miles, kilometers, and yards.', keywords: 'distance size scale metric imperial' },
-  { id: 'weight-conv', name: 'Weight & Mass Converter', category: 'converters', icon: 'Scale', desc: 'Convert kilograms, pounds, grams, ounces, and tons.', keywords: 'mass weight lb kg oz stone' },
-  { id: 'temp-conv', name: 'Temperature Converter', category: 'converters', icon: 'Thermometer', desc: 'Convert Celsius, Fahrenheit, and Kelvin scales.', keywords: 'heat weather celsius fahrenheit kelvin' },
-  { id: 'area-conv', name: 'Area Converter', category: 'converters', icon: 'Box', desc: 'Convert square meters, square feet, acres, and hectares.', keywords: 'land space sqft acre hectare metric' },
-  { id: 'volume-conv', name: 'Volume Converter', category: 'converters', icon: 'Volume2', desc: 'Convert liters, milliliters, gallons, cups, and fluid ounces.', keywords: 'liquid capacity liter gallon cup' },
-  { id: 'time-conv', name: 'Time Converter', category: 'converters', icon: 'Clock', desc: 'Convert seconds, minutes, hours, days, weeks, and years.', keywords: 'duration clock period unit' },
-  { id: 'speed-conv', name: 'Speed Converter', category: 'converters', icon: 'Compass', desc: 'Convert mph, km/h, meters per second, and knots.', keywords: 'velocity car fast pace distance' },
-  { id: 'pressure-conv', name: 'Pressure Converter', category: 'converters', icon: 'Activity', desc: 'Convert PSI, Bar, Pascal, Atmosphere, and Torr.', keywords: 'psi bar pascal atmosphere tire' },
-  { id: 'energy-conv', name: 'Energy Converter', category: 'converters', icon: 'Flame', desc: 'Convert Joules, Calories, Kilocalories, and kWh.', keywords: 'food power heat joule calorie' },
-  { id: 'power-conv', name: 'Power Converter', category: 'converters', icon: 'Cpu', desc: 'Convert Watts, Kilowatts, Horsepower, and BTU/hr.', keywords: 'watt horsepower electrical engine' },
-  { id: 'storage-conv', name: 'Data Storage Converter', category: 'converters', icon: 'HardDrive', desc: 'Convert Bytes, KB, MB, GB, TB, and Bits vs Bytes.', keywords: 'bytes megabytes gigabytes computer file size' },
-  { id: 'transfer-conv', name: 'Data Transfer Rate', category: 'converters', icon: 'Database', desc: 'Convert Mbps, Gbps, MB/s, and internet speed metrics.', keywords: 'bandwidth internet speed megabits' },
-  { id: 'angle-conv', name: 'Angle Converter', category: 'converters', icon: 'Compass', desc: 'Convert Degrees, Radians, Gradians, and Arcseconds.', keywords: 'geometry math circle trig' },
-  { id: 'fuel-conv', name: 'Fuel Economy Converter', category: 'converters', icon: 'Flame', desc: 'Convert MPG, L/100km, and km/L.', keywords: 'car gas mileage vehicle efficiency' },
-  { id: 'frequency-conv', name: 'Frequency Converter', category: 'converters', icon: 'Activity', desc: 'Convert Hertz, Kilohertz, Megahertz, and Gigahertz.', keywords: 'hz CPU sound radio wave' },
-  { id: 'force-conv', name: 'Force Converter', category: 'converters', icon: 'Activity', desc: 'Convert Newtons, Dyne, and Pound-force.', keywords: 'physics mass gravity push' },
-  { id: 'density-conv', name: 'Density Converter', category: 'converters', icon: 'Box', desc: 'Convert kg/m³, g/cm³, and lb/ft³.', keywords: 'mass volume physics material' },
-  { id: 'cooking-conv', name: 'Cooking Measurement Converter', category: 'converters', icon: 'Volume2', desc: 'Convert teaspoons, tablespoons, cups, fluid oz, and grams.', keywords: 'recipe kitchen bake culinary' },
-  { id: 'torque-conv', name: 'Torque Converter', category: 'converters', icon: 'Activity', desc: 'Convert Newton-meters, Foot-pounds, and Inch-pounds.', keywords: 'mechanic engine force rotation' },
-  { id: 'number-system', name: 'Number System Converter', category: 'converters', icon: 'Cpu', desc: 'Convert Binary, Octal, Decimal, and Hexadecimal numbers.', keywords: 'hex bin oct dec programmer code' },
+  // --- CALCULATORS (20) ---
+  { id: 'percentage-calc', name: 'Percentage Calculator', category: 'calculators', icon: 'Percent', desc: 'Find a percentage of a value, or the percentage one value is of another.', keywords: 'percent rate of fraction' },
+  { id: 'age-calc', name: 'Age Calculator', category: 'calculators', icon: 'Clock', desc: 'Calculate age in years, months and days from a birth date.', keywords: 'birthday birth date how old living' },
+  { id: 'bmi-calc', name: 'BMI Calculator', category: 'calculators', icon: 'Activity', desc: 'Estimate body mass index from height and weight.', keywords: 'body mass index health weight fitness' },
+  { id: 'simple-interest', name: 'Simple Interest Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Estimate simple interest and total value over time.', keywords: 'interest principal finance money rate' },
+  { id: 'compound-interest', name: 'Compound Interest Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Estimate compounded growth and interest earned.', keywords: 'investment annual compound finance savings wealth' },
+  { id: 'loan-emi', name: 'Loan EMI Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Estimate a fixed monthly loan payment and total repayment.', keywords: 'mortgage monthly payment loan bank car' },
+  { id: 'gst-calc', name: 'GST / Sales Tax Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Add or remove a goods and services tax rate.', keywords: 'tax vat sales tax price gross net' },
+  { id: 'discount-calc', name: 'Discount Calculator', category: 'calculators', icon: 'Percent', desc: 'Find the sale price and amount saved after a discount.', keywords: 'sale price markdown savings shopping' },
+  { id: 'profit-loss', name: 'Profit and Loss Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Compare selling and cost prices to find profit or loss.', keywords: 'margin markup business revenue' },
+  { id: 'salary-calc', name: 'Salary / Wage Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Convert gross salary between common pay periods.', keywords: 'paycheck annual hourly income wage' },
+  { id: 'date-diff', name: 'Date Difference Calculator', category: 'calculators', icon: 'Clock', desc: 'Count the calendar days between two dates.', keywords: 'days between date range duration calendar' },
+  { id: 'time-duration', name: 'Time Duration Calculator', category: 'calculators', icon: 'Clock', desc: 'Find elapsed time between clock times, including overnight intervals.', keywords: 'hours between elapsed clock timer' },
+  { id: 'average-calc', name: 'Average Calculator', category: 'calculators', icon: 'Calculator', desc: 'Calculate the arithmetic mean of a list of values.', keywords: 'mean numbers statistics median data' },
+  { id: 'ratio-calc', name: 'Ratio Calculator', category: 'calculators', icon: 'Calculator', desc: 'Simplify a two-part ratio and find its share.', keywords: 'proportion scale simplify aspect divide' },
+  { id: 'fraction-calc', name: 'Fraction Calculator', category: 'calculators', icon: 'Calculator', desc: 'Simplify a fraction and show its decimal value.', keywords: 'numerator denominator reduce math' },
+  { id: 'scientific-calc', name: 'Scientific Calculator', category: 'calculators', icon: 'Calculator', desc: 'Evaluate a scientific operation on one or two values.', keywords: 'sin cos log sqrt exponent trig' },
+  { id: 'basic-calc', name: 'Basic Calculator', category: 'calculators', icon: 'Calculator', desc: 'Quickly evaluate two values with a basic arithmetic operation.', keywords: 'arithmetic add subtract multiply divide math' },
+  { id: 'hcf-lcm', name: 'HCF and LCM Calculator', category: 'calculators', icon: 'Calculator', desc: 'Find the highest common factor and least common multiple.', keywords: 'gcd greatest common divisor multiple prime' },
+  { id: 'unit-price', name: 'Unit Price Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Compare cost per standard unit for shopping decisions.', keywords: 'price per unit compare value cost grocery' },
+  { id: 'savings-goal', name: 'Savings Goal Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Estimate the monthly amount needed to reach a savings target.', keywords: 'saving plan monthly savings goal target' },
 
   // --- IMAGE TOOLS ---
   ...IMAGE_TOOLS.map(t => ({
@@ -528,11 +584,9 @@ const PdfToolEngine = ({ toolId }) => {
     setNotice('');
 
     try {
-      // Dynamic import prevents Rollup build error when package is missing at start
       const pdfLib = await import('pdf-lib').catch(() => null);
 
       if (!pdfLib) {
-        // Fallback execution if pdf-lib package is not available
         const file = files[0];
         const combinedSize = files.reduce((acc, f) => acc + f.size, 0);
         const fallbackBlob = new Blob(files, { type: 'application/pdf' });
@@ -817,79 +871,168 @@ const UniversalCalculator = ({ toolId }) => {
   };
 
   const calculate = () => {
-    const num = (k) => parseFloat(inputs[k]) || 0;
+    const val = (k) => Number(inputs[k]);
+    const numeric = (keys) => keys.every(k => inputs[k] !== undefined && inputs[k] !== '' && Number.isFinite(Number(inputs[k])));
 
     switch (toolId) {
-      case 'basic-calc': {
-        try {
-          const expr = inputs.expression || '0';
-          const sanitized = expr.replace(/[^0-9+\-*/().]/g, '');
-          const val = Function(`'use strict'; return (${sanitized})`)();
-          setResult({ output: val });
-        } catch {
-          setResult({ error: 'Invalid Math Expression' });
-        }
-        break;
-      }
       case 'percentage-calc': {
-        const p = num('percent');
-        const total = num('total');
-        const ans = (p / 100) * total;
-        setResult({ output: `${p}% of ${total} = ${ans}` });
-        break;
-      }
-      case 'bmi-calc': {
-        const w = num('weight');
-        const h = num('height') / 100;
-        if (h > 0) {
-          const bmi = (w / (h * h)).toFixed(1);
-          let cat = 'Normal weight';
-          if (bmi < 18.5) cat = 'Underweight';
-          else if (bmi >= 25 && bmi < 29.9) cat = 'Overweight';
-          else if (bmi >= 30) cat = 'Obesity';
-          setResult({ output: `BMI: ${bmi}`, details: `Category: ${cat}` });
+        if (!numeric(['a', 'b'])) return;
+        const a = val('a'), b = val('b');
+        const mode = inputs.mode || 'X% of a number';
+        if (mode === 'What percent is X of Y') {
+          if (b === 0) return setResult({ error: 'Denominator cannot be zero.' });
+          const res = (a / b) * 100;
+          setResult({ output: `${fmt(res)}%`, note: `${fmt(a)} is this share of ${fmt(b)}.` });
+        } else {
+          const res = (a * b) / 100;
+          setResult({ output: fmt(res), note: `${fmt(res)} is ${fmt(a)}% of ${fmt(b)}.` });
         }
-        break;
-      }
-      case 'simple-interest': {
-        const p = num('principal');
-        const r = num('rate');
-        const t = num('time');
-        const interest = (p * r * t) / 100;
-        setResult({ output: `Interest: $${interest.toFixed(2)}`, details: `Total Amount: $${(p + interest).toFixed(2)}` });
-        break;
-      }
-      case 'loan-emi': {
-        const p = num('principal');
-        const r = num('rate') / 12 / 100;
-        const n = num('months');
-        if (p && r && n) {
-          const emi = (p * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
-          const totalPay = emi * n;
-          setResult({ output: `Monthly EMI: $${emi.toFixed(2)}`, details: `Total Interest: $${(totalPay - p).toFixed(2)}` });
-        }
-        break;
-      }
-      case 'gst-calc': {
-        const amt = num('amount');
-        const gstRate = num('rate');
-        const gstAmt = (amt * gstRate) / 100;
-        setResult({ output: `GST Amount: $${gstAmt.toFixed(2)}`, details: `Total Price: $${(amt + gstAmt).toFixed(2)}` });
         break;
       }
       case 'age-calc': {
-        if (inputs.dob) {
-          const birth = new Date(inputs.dob);
-          const now = new Date();
-          const diffMs = now - birth;
-          const ageYears = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 365.25));
-          const ageDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-          setResult({ output: `Age: ${ageYears} Years`, details: `Total Living Days: ${ageDays.toLocaleString()} days` });
+        if (!inputs.birth || !inputs.on) return;
+        const b = new Date(`${inputs.birth}T12:00:00`), d = new Date(`${inputs.on}T12:00:00`);
+        if (Number.isNaN(+b) || d < b) return setResult({ error: 'Invalid date selection.' });
+        let y = d.getFullYear() - b.getFullYear(), m = d.getMonth() - b.getMonth(), day = d.getDate() - b.getDate();
+        if (day < 0) { m--; day += new Date(d.getFullYear(), d.getMonth(), 0).getDate(); }
+        if (m < 0) { y--; m += 12; }
+        setResult({ output: `${y} years, ${m} months, ${day} days`, note: 'Age is calculated from calendar dates, including leap years.' });
+        break;
+      }
+      case 'bmi-calc': {
+        if (!numeric(['weight', 'height']) || val('weight') <= 0 || val('height') <= 0) return;
+        const isImperial = inputs.units?.startsWith('Imperial');
+        const bmi = isImperial ? val('weight') * 703 / (val('height') ** 2) : val('weight') / ((val('height') / 100) ** 2);
+        const note = bmi < 18.5 ? 'Below common adult reference range (18.5–24.9).' : bmi < 25 ? 'Within normal adult reference range (18.5–24.9).' : bmi < 30 ? 'Above normal adult reference range.' : 'In obesity range.';
+        setResult({ output: `BMI: ${fmt(bmi)}`, note });
+        break;
+      }
+      case 'simple-interest': {
+        if (!numeric(['principal', 'rate', 'years'])) return;
+        const i = val('principal') * val('rate') * val('years') / 100;
+        setResult({ output: `Interest: ${fmt(i)}`, note: `Total Value: ${fmt(val('principal') + i)}` });
+        break;
+      }
+      case 'compound-interest': {
+        if (!numeric(['principal', 'rate', 'years'])) return;
+        const periods = { 'Annually': 1, 'Semi-annually': 2, 'Quarterly': 4, 'Monthly': 12, 'Daily': 365 };
+        const n = periods[inputs.frequency || 'Annually'];
+        const total = val('principal') * (1 + val('rate') / 100 / n) ** (n * val('years'));
+        setResult({ output: `Final Value: ${fmt(total)}`, note: `Total Growth: ${fmt(total - val('principal'))}` });
+        break;
+      }
+      case 'loan-emi': {
+        if (!numeric(['principal', 'rate', 'years'])) return;
+        const n = val('years') * 12, r = val('rate') / 1200, p = val('principal');
+        const emi = r === 0 ? p / n : p * r * (1 + r) ** n / ((1 + r) ** n - 1);
+        setResult({ output: `Monthly EMI: ${fmt(emi)}`, note: `Total Repayment: ${fmt(emi * n)} over ${n} payments.` });
+        break;
+      }
+      case 'gst-calc': {
+        if (!numeric(['amount', 'rate'])) return;
+        const a = val('amount'), r = val('rate') / 100;
+        const isRemove = inputs.mode === 'Remove tax from total';
+        const net = isRemove ? a / (1 + r) : a;
+        const total = isRemove ? a : a * (1 + r);
+        setResult({ output: `Total: ${fmt(total)}`, note: `Net Amount: ${fmt(net)} | Tax: ${fmt(total - net)}` });
+        break;
+      }
+      case 'discount-calc': {
+        if (!numeric(['price', 'discount'])) return;
+        const save = val('price') * val('discount') / 100;
+        setResult({ output: `Sale Price: ${fmt(val('price') - save)}`, note: `You save ${fmt(save)} (${fmt(val('discount'))}% off).` });
+        break;
+      }
+      case 'profit-loss': {
+        if (!numeric(['cost', 'selling'])) return;
+        const diff = val('selling') - val('cost'), pct = (diff / val('cost')) * 100;
+        setResult({ output: `${diff >= 0 ? 'Profit' : 'Loss'}: ${fmt(Math.abs(diff))}`, note: `${fmt(Math.abs(pct))}% ${diff >= 0 ? 'gain' : 'loss'} on cost.` });
+        break;
+      }
+      case 'salary-calc': {
+        if (!numeric(['amount', 'hours'])) return;
+        const a = val('amount'), hours = val('hours');
+        const period = inputs.period || 'Year';
+        const annual = period === 'Month' ? a * 12 : period === 'Week' ? a * 52 : period === 'Hour' ? a * hours * 52 : a;
+        setResult({ output: `Annual: ${fmt(annual)}`, note: `Monthly: ${fmt(annual / 12)} | Weekly: ${fmt(annual / 52)} | Hourly: ${fmt(annual / (hours * 52))}` });
+        break;
+      }
+      case 'date-diff': {
+        if (!inputs.start || !inputs.end) return;
+        const a = new Date(`${inputs.start}T00:00:00Z`), b = new Date(`${inputs.end}T00:00:00Z`);
+        const days = Math.round((b.getTime() - a.getTime()) / 86400000);
+        setResult({ output: `${Math.abs(days).toLocaleString()} Days`, note: days < 0 ? 'End date is earlier than start date.' : 'Counts elapsed calendar days.' });
+        break;
+      }
+      case 'time-duration': {
+        const parse = (s) => { const m = (s || '').match(/^(\d{1,2}):(\d{2})$/); return m && +m[1] < 24 && +m[2] < 60 ? +m[1] * 60 + +m[2] : NaN; };
+        let a = parse(inputs.start), b = parse(inputs.end);
+        if (!Number.isFinite(a) || !Number.isFinite(b)) return;
+        if (b < a) b += 1440;
+        const n = b - a;
+        setResult({ output: `${Math.floor(n / 60)} hr ${n % 60} min`, note: `${fmt(n / 60)} decimal hours.` });
+        break;
+      }
+      case 'average-calc': {
+        const ns = (inputs.numbers || '').split(/[,\s]+/).filter(Boolean).map(Number);
+        if (!ns.length || ns.some(n => !Number.isFinite(n))) return;
+        const mean = ns.reduce((x, y) => x + y, 0) / ns.length;
+        setResult({ output: `Mean: ${fmt(mean)}`, note: `From ${ns.length} values; Sum: ${fmt(ns.reduce((x, y) => x + y, 0))}` });
+        break;
+      }
+      case 'ratio-calc': {
+        if (!numeric(['a', 'b'])) return;
+        const gcd = (x, y) => y === 0 ? Math.abs(x) : gcd(y, x % y);
+        const g = gcd(val('a'), val('b'));
+        setResult({ output: `Simplified Ratio: ${val('a') / g} : ${val('b') / g}`, note: `First share: ${fmt((val('a') / (val('a') + val('b'))) * 100)}% of total.` });
+        break;
+      }
+      case 'fraction-calc': {
+        if (!numeric(['numerator', 'denominator']) || val('denominator') === 0) return;
+        const gcd = (x, y) => y === 0 ? Math.abs(x) : gcd(y, x % y);
+        const g = gcd(val('numerator'), val('denominator'));
+        const sign = val('denominator') < 0 ? -1 : 1;
+        setResult({ output: `Simplified Fraction: ${(val('numerator') / g) * sign} / ${Math.abs(val('denominator') / g)}`, note: `Decimal value: ${fmt(val('numerator') / val('denominator'))}` });
+        break;
+      }
+      case 'scientific-calc': {
+        if (!numeric(['x'])) return;
+        const x = val('x'), y = val('y');
+        let n;
+        switch (inputs.operation) {
+          case 'Square root': n = x >= 0 ? Math.sqrt(x) : NaN; break;
+          case 'Square': n = x * x; break;
+          case 'Cube': n = x ** 3; break;
+          case 'Sine (degrees)': n = Math.sin(x * Math.PI / 180); break;
+          case 'Cosine (degrees)': n = Math.cos(x * Math.PI / 180); break;
+          case 'Tangent (degrees)': n = Math.tan(x * Math.PI / 180); break;
+          case 'Natural log': n = x > 0 ? Math.log(x) : NaN; break;
+          case 'Log base 10': n = x > 0 ? Math.log10(x) : NaN; break;
+          default: n = x ** y;
         }
+        setResult({ output: Number.isFinite(n) ? fmt(n) : 'Invalid Input', note: `Operation: ${inputs.operation || 'Power'}` });
+        break;
+      }
+      case 'hcf-lcm': {
+        if (!numeric(['a', 'b'])) return;
+        const gcd = (x, y) => y === 0 ? Math.abs(x) : gcd(y, x % y);
+        const g = gcd(val('a'), val('b'));
+        setResult({ output: `HCF (GCD): ${g}`, note: `LCM: ${fmt(Math.abs((val('a') / g) * val('b')))}` });
+        break;
+      }
+      case 'unit-price': {
+        if (!numeric(['price', 'quantity']) || val('quantity') <= 0) return;
+        setResult({ output: `${fmt(val('price') / val('quantity'))} per ${inputs.unit || 'unit'}`, note: `${fmt(val('quantity'))} ${inputs.unit || 'units'} in pack.` });
+        break;
+      }
+      case 'savings-goal': {
+        if (!numeric(['goal', 'current', 'months']) || val('months') <= 0) return;
+        const rem = Math.max(0, val('goal') - val('current'));
+        setResult({ output: `${fmt(rem / val('months'))} per month`, note: rem === 0 ? 'Target already reached!' : 'Straight-line estimate.' });
         break;
       }
       default: {
-        setResult({ output: 'Calculator executed successfully.' });
+        setResult({ output: 'Calculator executed.' });
       }
     }
   };
@@ -898,143 +1041,72 @@ const UniversalCalculator = ({ toolId }) => {
     <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-4">
       <h3 className="font-bold text-gray-900 text-lg capitalize">{toolId.replace('-', ' ')}</h3>
 
-      {toolId === 'basic-calc' && (
-        <div>
-          <label className="block text-xs font-semibold text-gray-600 mb-1">Math Expression</label>
-          <input
-            type="text"
-            placeholder="e.g. 15 * 4 + (100 / 2)"
-            onChange={(e) => handleInputChange('expression', e.target.value)}
-            className="w-full border rounded-lg p-3 text-lg font-mono focus:ring-2 focus:ring-indigo-500 outline-none"
-          />
-        </div>
-      )}
-
       {toolId === 'percentage-calc' && (
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Percentage (%)</label>
-            <input
-              type="number"
-              placeholder="15"
-              onChange={(e) => handleInputChange('percent', e.target.value)}
-              className="w-full border rounded-lg p-2.5 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Total Value</label>
-            <input
-              type="number"
-              placeholder="500"
-              onChange={(e) => handleInputChange('total', e.target.value)}
-              className="w-full border rounded-lg p-2.5 text-sm"
-            />
-          </div>
-        </div>
-      )}
-
-      {toolId === 'bmi-calc' && (
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Weight (kg)</label>
-            <input
-              type="number"
-              placeholder="70"
-              onChange={(e) => handleInputChange('weight', e.target.value)}
-              className="w-full border rounded-lg p-2.5 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Height (cm)</label>
-            <input
-              type="number"
-              placeholder="175"
-              onChange={(e) => handleInputChange('height', e.target.value)}
-              className="w-full border rounded-lg p-2.5 text-sm"
-            />
-          </div>
-        </div>
-      )}
-
-      {toolId === 'simple-interest' && (
-        <div className="grid grid-cols-3 gap-3">
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Principal ($)</label>
-            <input
-              type="number"
-              placeholder="1000"
-              onChange={(e) => handleInputChange('principal', e.target.value)}
-              className="w-full border rounded-lg p-2.5 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Rate (%)</label>
-            <input
-              type="number"
-              placeholder="5"
-              onChange={(e) => handleInputChange('rate', e.target.value)}
-              className="w-full border rounded-lg p-2.5 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Time (Years)</label>
-            <input
-              type="number"
-              placeholder="3"
-              onChange={(e) => handleInputChange('time', e.target.value)}
-              className="w-full border rounded-lg p-2.5 text-sm"
-            />
-          </div>
-        </div>
-      )}
-
-      {toolId === 'loan-emi' && (
-        <div className="grid grid-cols-3 gap-3">
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Loan Amount ($)</label>
-            <input
-              type="number"
-              placeholder="25000"
-              onChange={(e) => handleInputChange('principal', e.target.value)}
-              className="w-full border rounded-lg p-2.5 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Annual Interest (%)</label>
-            <input
-              type="number"
-              placeholder="8.5"
-              onChange={(e) => handleInputChange('rate', e.target.value)}
-              className="w-full border rounded-lg p-2.5 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Tenure (Months)</label>
-            <input
-              type="number"
-              placeholder="36"
-              onChange={(e) => handleInputChange('months', e.target.value)}
-              className="w-full border rounded-lg p-2.5 text-sm"
-            />
+        <div className="space-y-3">
+          <select onChange={(e) => handleInputChange('mode', e.target.value)} className="w-full border rounded-lg p-2.5 text-sm bg-white">
+            <option>X% of a number</option>
+            <option>What percent is X of Y</option>
+          </select>
+          <div className="grid grid-cols-2 gap-3">
+            <input type="number" placeholder="Value A (18)" onChange={(e) => handleInputChange('a', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+            <input type="number" placeholder="Value B (240)" onChange={(e) => handleInputChange('b', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
           </div>
         </div>
       )}
 
       {toolId === 'age-calc' && (
-        <div>
-          <label className="block text-xs font-semibold text-gray-600 mb-1">Date of Birth</label>
-          <input
-            type="date"
-            onChange={(e) => handleInputChange('dob', e.target.value)}
-            className="w-full border rounded-lg p-2.5 text-sm"
-          />
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Date of Birth</label>
+            <input type="date" onChange={(e) => handleInputChange('birth', e.target.value)} className="w-full border rounded-lg p-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Age On Date</label>
+            <input type="date" onChange={(e) => handleInputChange('on', e.target.value)} className="w-full border rounded-lg p-2 text-sm" />
+          </div>
         </div>
       )}
 
-      <button
-        onClick={calculate}
-        className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition"
-      >
+      {toolId === 'bmi-calc' && (
+        <div className="space-y-3">
+          <select onChange={(e) => handleInputChange('units', e.target.value)} className="w-full border rounded-lg p-2.5 text-sm bg-white">
+            <option>Metric (kg, cm)</option>
+            <option>Imperial (lb, in)</option>
+          </select>
+          <div className="grid grid-cols-2 gap-3">
+            <input type="number" placeholder="Weight" onChange={(e) => handleInputChange('weight', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+            <input type="number" placeholder="Height" onChange={(e) => handleInputChange('height', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+          </div>
+        </div>
+      )}
+
+      {['simple-interest', 'compound-interest', 'loan-emi'].includes(toolId) && (
+        <div className="grid grid-cols-3 gap-3">
+          <input type="number" placeholder="Principal ($)" onChange={(e) => handleInputChange('principal', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+          <input type="number" placeholder="Annual Rate (%)" onChange={(e) => handleInputChange('rate', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+          <input type="number" placeholder="Years" onChange={(e) => handleInputChange('years', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+        </div>
+      )}
+
+      {toolId === 'time-duration' && (
+        <div className="grid grid-cols-2 gap-3">
+          <input type="text" placeholder="Start Time (e.g. 09:30)" onChange={(e) => handleInputChange('start', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+          <input type="text" placeholder="End Time (e.g. 17:15)" onChange={(e) => handleInputChange('end', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+        </div>
+      )}
+
+      {toolId === 'average-calc' && (
+        <input type="text" placeholder="Numbers separated by commas (12, 18, 24)" onChange={(e) => handleInputChange('numbers', e.target.value)} className="w-full border rounded-lg p-2.5 text-sm" />
+      )}
+
+      {!['percentage-calc', 'age-calc', 'bmi-calc', 'simple-interest', 'compound-interest', 'loan-emi', 'time-duration', 'average-calc'].includes(toolId) && (
+        <div className="grid grid-cols-2 gap-3">
+          <input type="number" placeholder="First Value" onChange={(e) => handleInputChange('a', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+          <input type="number" placeholder="Second Value" onChange={(e) => handleInputChange('b', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+        </div>
+      )}
+
+      <button onClick={calculate} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition">
         Calculate Result
       </button>
 
@@ -1045,7 +1117,7 @@ const UniversalCalculator = ({ toolId }) => {
           ) : (
             <>
               <p className="text-indigo-900 font-bold text-lg">{result.output}</p>
-              {result.details && <p className="text-indigo-700 text-xs">{result.details}</p>}
+              {result.note && <p className="text-indigo-700 text-xs">{result.note}</p>}
             </>
           )}
         </div>
@@ -1055,35 +1127,25 @@ const UniversalCalculator = ({ toolId }) => {
 };
 
 const UniversalConverter = ({ toolId }) => {
+  const toolObj = TOOLS.find(t => t.id === toolId);
+  const rawSlug = toolObj?.rawSlug || toolId.replace('-conv', '');
+  const units = toolObj?.units || [];
+
   const [val, setVal] = useState('1');
-  const [fromUnit, setFromUnit] = useState('m');
-  const [toUnit, setToUnit] = useState('ft');
+  const [fromUnit, setFromUnit] = useState(units[0]?.[0] || '');
+  const [toUnit, setToUnit] = useState(units[1]?.[0] || units[0]?.[0] || '');
 
-  const conversions = {
-    'length-conv': { m: 1, km: 0.001, cm: 100, mm: 1000, ft: 3.28084, inch: 39.3701, mile: 0.000621371 },
-    'weight-conv': { kg: 1, g: 1000, lb: 2.20462, oz: 35.274, ton: 0.001 },
-    'storage-conv': { B: 1, KB: 1 / 1024, MB: 1 / (1024 * 1024), GB: 1 / (1024 * 1024 * 1024), TB: 1 / (1024 * 1024 * 1024 * 1024) }
-  };
-
-  const currentMap = conversions[toolId] || conversions['length-conv'];
-  const units = Object.keys(currentMap);
-
-  const calculateConversion = () => {
-    const inputNum = parseFloat(val) || 0;
-    const baseVal = inputNum / currentMap[fromUnit];
-    const converted = baseVal * currentMap[toUnit];
-    return converted.toFixed(6);
-  };
+  const result = convertUnits(rawSlug, val, fromUnit, toUnit);
 
   return (
     <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-6">
-      <h3 className="font-bold text-gray-900 text-lg capitalize">{toolId.replace('-', ' ')}</h3>
+      <h3 className="font-bold text-gray-900 text-lg capitalize">{toolObj?.name || toolId.replace('-', ' ')}</h3>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
         <div>
           <label className="block text-xs font-semibold text-gray-600 mb-1">Value</label>
           <input
-            type="number"
+            type={rawSlug === 'number-system' ? 'text' : 'number'}
             value={val}
             onChange={(e) => setVal(e.target.value)}
             className="w-full border rounded-lg p-2.5 text-sm font-semibold"
@@ -1097,8 +1159,8 @@ const UniversalConverter = ({ toolId }) => {
             onChange={(e) => setFromUnit(e.target.value)}
             className="w-full border rounded-lg p-2.5 text-sm bg-white"
           >
-            {units.map((u) => (
-              <option key={u} value={u}>{u.toUpperCase()}</option>
+            {units.map(([u]) => (
+              <option key={u} value={u}>{u}</option>
             ))}
           </select>
         </div>
@@ -1110,8 +1172,8 @@ const UniversalConverter = ({ toolId }) => {
             onChange={(e) => setToUnit(e.target.value)}
             className="w-full border rounded-lg p-2.5 text-sm bg-white"
           >
-            {units.map((u) => (
-              <option key={u} value={u}>{u.toUpperCase()}</option>
+            {units.map(([u]) => (
+              <option key={u} value={u}>{u}</option>
             ))}
           </select>
         </div>
@@ -1120,7 +1182,7 @@ const UniversalConverter = ({ toolId }) => {
       <div className="p-6 bg-indigo-50 border border-indigo-100 rounded-xl text-center">
         <span className="text-xs text-indigo-600 uppercase font-bold tracking-wider">Converted Output</span>
         <p className="text-3xl font-extrabold text-indigo-900 mt-1">
-          {calculateConversion()} <span className="text-lg font-medium">{toUnit.toUpperCase()}</span>
+          {result || '—'} <span className="text-lg font-medium">{toUnit}</span>
         </p>
       </div>
     </div>
