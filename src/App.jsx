@@ -71,7 +71,7 @@ const TOOLS = [
   { id: 'webp-to-jpg', name: 'WEBP to JPG', category: 'image', icon: 'ImageIcon', desc: 'Convert web WEBP images to standard JPG format.', keywords: 'browser format photo convert' },
   { id: 'jpg-to-webp', name: 'JPG to WEBP', category: 'image', icon: 'ImageIcon', desc: 'Convert JPG to modern web-optimized WEBP images.', keywords: 'web speed compress speed' },
   { id: 'png-to-webp', name: 'PNG to WEBP', category: 'image', icon: 'ImageIcon', desc: 'Convert PNG to WEBP while preserving transparency.', keywords: 'transparent alpha compression' },
-  { id: 'format-converter', name: 'Image Format Converter', category: 'image', icon: 'ImageIcon', desc: 'Universal image converter supporting JPG, PNG, WEBP, GIF, BMP.', keywords: 'universal convert export format' },
+  { id: 'format-converter', name: 'Image Format Converter', category: 'image', icon: 'ImageIcon', desc: 'Universal image converter supporting JPG, PNG, WEBP.', keywords: 'universal convert export format' },
   { id: 'change-dimensions', name: 'Change Image Dimensions', category: 'image', icon: 'Maximize2', desc: 'Set custom pixel width and height directly.', keywords: 'px width height aspect ratio' },
   { id: 'resize-percentage', name: 'Resize Image by Percentage', category: 'image', icon: 'Percent', desc: 'Scale image up or down by 25%, 50%, 75%, 200%.', keywords: 'half double scale shrink zoom' },
   { id: 'resize-pixels', name: 'Resize Image by Pixels', category: 'image', icon: 'Maximize2', desc: 'Precision pixel dimension scaling tool.', keywords: 'px resolution desktop mobile' },
@@ -134,20 +134,34 @@ const IconRenderer = ({ name, className = "w-5 h-5" }) => {
   return icons[name] || <Sparkles className={className} />;
 };
 
-const AdvancedCompressImage = () => {
+const AdvancedCompressImage = ({ toolId }) => {
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [origInfo, setOrigInfo] = useState({ width: 0, height: 0, size: 0, type: '' });
+  
+  // Options & Parameters
   const [width, setWidth] = useState(0);
   const [height, setHeight] = useState(0);
   const [keepAspect, setKeepAspect] = useState(true);
   const [aspectRatio, setAspectRatio] = useState(1);
+  const [percentage, setPercentage] = useState(50);
   const [targetSizeKb, setTargetSizeKb] = useState('');
   const [quality, setQuality] = useState(80);
   const [outputFormat, setOutputFormat] = useState('image/jpeg');
+  const [rotation, setRotation] = useState(90);
+  const [flipMode, setFlipMode] = useState('horizontal');
+  const [blurRadius, setBlurRadius] = useState(4);
+  const [watermarkText, setWatermarkText] = useState('');
+  const [cropX, setCropX] = useState(0);
+  const [cropY, setCropY] = useState(0);
+  const [cropWidth, setCropWidth] = useState(100);
+  const [cropHeight, setCropHeight] = useState(100);
+  
   const [warningMsg, setWarningMsg] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState(null);
+
+  const currentTool = toolId || 'compress-image';
 
   const handleFileChange = (e) => {
     const selected = e.target.files[0];
@@ -170,115 +184,145 @@ const AdvancedCompressImage = () => {
       });
       setWidth(img.naturalWidth);
       setHeight(img.naturalHeight);
+      setCropWidth(img.naturalWidth);
+      setCropHeight(img.naturalHeight);
       setAspectRatio(img.naturalWidth / img.naturalHeight);
       setResult(null);
 
-      if (selected.type === 'image/png' && outputFormat === 'image/jpeg') {
-        setWarningMsg('Converting transparent PNG to JPEG will replace transparent areas with a white background.');
-      } else {
-        setWarningMsg('');
-      }
+      // Auto-set preset output format based on specific conversion tools
+      if (currentTool === 'jpg-to-png') setOutputFormat('image/png');
+      else if (currentTool === 'png-to-jpg' || currentTool === 'webp-to-jpg') setOutputFormat('image/jpeg');
+      else if (currentTool === 'jpg-to-webp' || currentTool === 'png-to-webp') setOutputFormat('image/webp');
+      else if (currentTool === 'circular-crop') setOutputFormat('image/png');
+      else setOutputFormat(selected.type);
     };
     img.src = url;
   };
 
-  const handleWidthChange = (val) => {
-    const w = parseInt(val) || 0;
-    setWidth(w);
-    if (keepAspect && aspectRatio > 0) {
-      setHeight(Math.round(w / aspectRatio));
-    }
-  };
-
-  const handleHeightChange = (val) => {
-    const h = parseInt(val) || 0;
-    setHeight(h);
-    if (keepAspect && aspectRatio > 0) {
-      setWidth(Math.round(h * aspectRatio));
-    }
-  };
-
-  const applyPercentageScale = (pct) => {
-    if (!origInfo.width) return;
-    const newW = Math.round(origInfo.width * (pct / 100));
-    const newH = Math.round(origInfo.height * (pct / 100));
-    setWidth(newW);
-    setHeight(newH);
-  };
-
-  const resetDimensions = () => {
-    setWidth(origInfo.width);
-    setHeight(origInfo.height);
-  };
-
-  const handleFormatChange = (fmt) => {
-    setOutputFormat(fmt);
-    if (origInfo.type === 'image/png' && fmt === 'image/jpeg') {
-      setWarningMsg('Converting transparent PNG to JPEG will replace transparent areas with a white background.');
-    } else {
-      setWarningMsg('');
-    }
-  };
-
-  const processImage = async (mode) => {
+  const processImageTool = async () => {
     if (!file || !previewUrl) return;
     setIsProcessing(true);
 
+    let bitmap;
+    try {
+      bitmap = await createImageBitmap(file);
+    } catch {
+      alert('Failed to load image.');
+      setIsProcessing(false);
+      return;
+    }
+
+    const sourceWidth = bitmap.width;
+    const sourceHeight = bitmap.height;
+
+    let outW = width || sourceWidth;
+    let outH = height || sourceHeight;
+
+    if (currentTool === 'resize-percentage') {
+      outW = Math.max(1, Math.round(sourceWidth * (percentage / 100)));
+      outH = Math.max(1, Math.round(sourceHeight * (percentage / 100)));
+    } else if (currentTool === 'make-square' || currentTool === 'circular-crop') {
+      outW = Math.min(sourceWidth, sourceHeight);
+      outH = outW;
+    } else if (currentTool === 'crop-image') {
+      outW = cropWidth;
+      outH = cropHeight;
+    } else if (currentTool === 'rotate-image' && (rotation === 90 || rotation === 270)) {
+      outW = sourceHeight;
+      outH = sourceWidth;
+    }
+
     const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    const img = new Image();
-    img.src = previewUrl;
-
-    await new Promise((res) => (img.onload = res));
-
-    const finalW = width > 0 ? width : img.naturalWidth;
-    const finalH = height > 0 ? height : img.naturalHeight;
-
-    canvas.width = finalW;
-    canvas.height = finalH;
+    canvas.width = outW;
+    canvas.height = outH;
+    const ctx = canvas.getContext('2d', { alpha: outputFormat !== 'image/jpeg' });
 
     if (outputFormat === 'image/jpeg') {
       ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, finalW, finalH);
+      ctx.fillRect(0, 0, outW, outH);
     }
 
-    ctx.drawImage(img, 0, 0, finalW, finalH);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
 
-    let currentQuality = quality / 100;
-    let blob = null;
+    if (currentTool === 'rotate-image') {
+      ctx.save();
+      ctx.translate(outW / 2, outH / 2);
+      ctx.rotate((rotation * Math.PI) / 180);
+      ctx.drawImage(bitmap, -sourceWidth / 2, -sourceHeight / 2);
+      ctx.restore();
+    } else if (currentTool === 'flip-image') {
+      ctx.save();
+      ctx.translate(flipMode === 'horizontal' ? outW : 0, flipMode === 'vertical' ? outH : 0);
+      ctx.scale(flipMode === 'horizontal' ? -1 : 1, flipMode === 'vertical' ? -1 : 1);
+      ctx.drawImage(bitmap, 0, 0, outW, outH);
+      ctx.restore();
+    } else if (currentTool === 'circular-crop') {
+      ctx.beginPath();
+      ctx.arc(outW / 2, outH / 2, outW / 2, 0, Math.PI * 2);
+      ctx.clip();
+      const sx = Math.floor((sourceWidth - outW) / 2);
+      const sy = Math.floor((sourceHeight - outH) / 2);
+      ctx.drawImage(bitmap, sx, sy, outW, outH, 0, 0, outW, outH);
+    } else {
+      if (currentTool === 'grayscale-image') ctx.filter = 'grayscale(1)';
+      if (currentTool === 'blur-image') ctx.filter = `blur(${blurRadius}px)`;
 
-    if (mode === 'compress' && targetSizeKb > 0 && outputFormat !== 'image/png') {
+      let sx = 0, sy = 0, sw = sourceWidth, sh = sourceHeight;
+      if (currentTool === 'make-square') {
+        sw = outW; sh = outH;
+        sx = Math.floor((sourceWidth - sw) / 2);
+        sy = Math.floor((sourceHeight - sh) / 2);
+      } else if (currentTool === 'crop-image') {
+        sx = cropX; sy = cropY; sw = cropWidth; sh = cropHeight;
+      }
+
+      ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, outW, outH);
+      ctx.filter = 'none';
+    }
+
+    if (currentTool === 'add-text-image' && watermarkText) {
+      const fontSize = Math.max(16, Math.round(outW / 18));
+      ctx.font = `600 ${fontSize}px system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+      ctx.lineWidth = 3;
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeText(watermarkText, outW / 2, outH - fontSize * 0.7);
+      ctx.fillText(watermarkText, outW / 2, outH - fontSize * 0.7);
+    }
+
+    let q = quality / 100;
+    let blob = await new Promise((res) => canvas.toBlob(res, outputFormat, q));
+
+    if (currentTool === 'compress-image' && targetSizeKb > 0 && outputFormat !== 'image/png') {
       const targetBytes = targetSizeKb * 1024;
-      let minQ = 0.05;
-      let maxQ = 0.98;
-      
+      let minQ = 0.05, maxQ = q;
       for (let i = 0; i < 6; i++) {
         const midQ = (minQ + maxQ) / 2;
-        blob = await new Promise((res) => canvas.toBlob(res, outputFormat, midQ));
-        if (blob.size > targetBytes) {
-          maxQ = midQ;
-        } else {
+        const candidate = await new Promise((res) => canvas.toBlob(res, outputFormat, midQ));
+        if (candidate.size <= targetBytes) {
+          blob = candidate;
           minQ = midQ;
+        } else {
+          maxQ = midQ;
         }
       }
-      currentQuality = minQ;
-    } else {
-      blob = await new Promise((res) => canvas.toBlob(res, outputFormat, currentQuality));
     }
 
-    const outputUrl = URL.createObjectURL(blob);
-    const reduction = (((origInfo.size - blob.size) / origInfo.size) * 100).toFixed(1);
+    bitmap.close();
+    const url = URL.createObjectURL(blob);
+    const ext = outputFormat === 'image/jpeg' ? 'jpg' : outputFormat.split('/')[1];
 
     setResult({
-      url: outputUrl,
-      width: finalW,
-      height: finalH,
+      url,
+      width: outW,
+      height: outH,
       size: blob.size,
-      reduction: reduction,
-      format: outputFormat.split('/')[1].toUpperCase(),
-      fileName: `processed_${file.name.split('.')[0]}.${outputFormat.split('/')[1]}`
+      reduction: (((origInfo.size - blob.size) / origInfo.size) * 100).toFixed(1),
+      fileName: `processed_${file.name.split('.')[0]}.${ext}`
     });
-
     setIsProcessing(false);
   };
 
@@ -315,160 +359,165 @@ const AdvancedCompressImage = () => {
             </div>
           </div>
 
+          {/* Dynamic Configuration Controls per Tool */}
           <div className="space-y-4">
-            <h3 className="text-lg font-bold text-gray-900">2. Resize Options</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <h3 className="text-lg font-bold text-gray-900">2. Tool Settings</h3>
+
+            {currentTool === 'resize-percentage' && (
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Width (px)</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Resize Percentage (%)</label>
                 <input
                   type="number"
-                  value={width}
-                  onChange={(e) => handleWidthChange(e.target.value)}
-                  className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  value={percentage}
+                  onChange={(e) => setPercentage(Number(e.target.value))}
+                  className="w-full border rounded-lg p-2.5 text-sm"
                 />
               </div>
+            )}
+
+            {currentTool === 'rotate-image' && (
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Height (px)</label>
-                <input
-                  type="number"
-                  value={height}
-                  onChange={(e) => handleHeightChange(e.target.value)}
-                  className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-              <label className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={keepAspect}
-                  onChange={(e) => setKeepAspect(e.target.checked)}
-                  className="rounded text-indigo-600 focus:ring-indigo-500"
-                />
-                <span>Maintain Aspect Ratio ({aspectRatio.toFixed(2)})</span>
-              </label>
-
-              <div className="flex items-center space-x-2">
-                <span className="text-xs text-gray-500">Scale Presets:</span>
-                {[25, 50, 75, 100].map((pct) => (
-                  <button
-                    key={pct}
-                    onClick={() => applyPercentageScale(pct)}
-                    className="px-2.5 py-1 text-xs font-semibold bg-gray-100 hover:bg-gray-200 rounded-md transition"
-                  >
-                    {pct}%
-                  </button>
-                ))}
-                <button
-                  onClick={resetDimensions}
-                  className="px-2.5 py-1 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-md transition"
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Rotation Angle</label>
+                <select
+                  value={rotation}
+                  onChange={(e) => setRotation(Number(e.target.value))}
+                  className="w-full border rounded-lg p-2.5 text-sm bg-white"
                 >
-                  Reset
-                </button>
+                  <option value={90}>90° Clockwise</option>
+                  <option value={180}>180° Turn</option>
+                  <option value={270}>270° Counter-Clockwise</option>
+                </select>
               </div>
-            </div>
-          </div>
+            )}
 
-          <div className="space-y-4 pt-2">
-            <h3 className="text-lg font-bold text-gray-900">3. Compression & Target Size</h3>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {currentTool === 'flip-image' && (
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">
-                  Target File Size (Optional KB)
-                </label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Flip Axis</label>
+                <select
+                  value={flipMode}
+                  onChange={(e) => setFlipMode(e.target.value)}
+                  className="w-full border rounded-lg p-2.5 text-sm bg-white"
+                >
+                  <option value="horizontal">Horizontal (Mirror)</option>
+                  <option value="vertical">Vertical</option>
+                </select>
+              </div>
+            )}
+
+            {currentTool === 'blur-image' && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Blur Amount: {blurRadius}px</label>
+                <input
+                  type="range"
+                  min="1"
+                  max="40"
+                  value={blurRadius}
+                  onChange={(e) => setBlurRadius(Number(e.target.value))}
+                  className="w-full accent-indigo-600"
+                />
+              </div>
+            )}
+
+            {currentTool === 'add-text-image' && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Overlay Caption / Text</label>
+                <input
+                  type="text"
+                  placeholder="Enter custom watermark text..."
+                  value={watermarkText}
+                  onChange={(e) => setWatermarkText(e.target.value)}
+                  className="w-full border rounded-lg p-2.5 text-sm"
+                />
+              </div>
+            )}
+
+            {currentTool === 'crop-image' && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Crop Width (px)</label>
+                  <input
+                    type="number"
+                    value={cropWidth}
+                    onChange={(e) => setCropWidth(Number(e.target.value))}
+                    className="w-full border rounded-lg p-2.5 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Crop Height (px)</label>
+                  <input
+                    type="number"
+                    value={cropHeight}
+                    onChange={(e) => setCropHeight(Number(e.target.value))}
+                    className="w-full border rounded-lg p-2.5 text-sm"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* General Dimension Settings */}
+            {['compress-image', 'resize-image', 'change-dimensions', 'resize-pixels'].includes(currentTool) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Width (px)</label>
+                  <input
+                    type="number"
+                    value={width}
+                    onChange={(e) => setWidth(Number(e.target.value))}
+                    className="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Height (px)</label>
+                  <input
+                    type="number"
+                    value={height}
+                    onChange={(e) => setHeight(Number(e.target.value))}
+                    className="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Target KB Compression & Format Selection */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Target File Size (Optional KB)</label>
                 <input
                   type="number"
                   placeholder="e.g. 200"
                   value={targetSizeKb}
                   onChange={(e) => setTargetSizeKb(e.target.value)}
-                  className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  className="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                 />
-                <div className="flex space-x-2 mt-2">
-                  {[50, 100, 200, 500].map((kb) => (
-                    <button
-                      key={kb}
-                      onClick={() => setTargetSizeKb(kb)}
-                      className="text-xs px-2 py-1 bg-gray-100 hover:bg-indigo-50 hover:text-indigo-600 rounded"
-                    >
-                      {kb}KB
-                    </button>
-                  ))}
-                </div>
               </div>
-
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">
-                  Manual Quality Slider: {quality}%
-                </label>
-                <input
-                  type="range"
-                  min="10"
-                  max="100"
-                  value={quality}
-                  onChange={(e) => setQuality(e.target.value)}
-                  className="w-full accent-indigo-600 mt-2"
-                />
-                <div className="flex justify-between text-xs text-gray-400 mt-1">
-                  <span>10% (Smaller)</span>
-                  <span>100% (High Quality)</span>
-                </div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Export Format</label>
+                <select
+                  value={outputFormat}
+                  onChange={(e) => setOutputFormat(e.target.value)}
+                  className="w-full border rounded-lg p-2.5 text-sm bg-white"
+                >
+                  <option value="image/jpeg">JPEG (.jpg)</option>
+                  <option value="image/png">PNG (.png)</option>
+                  <option value="image/webp">WEBP (.webp)</option>
+                </select>
               </div>
             </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Output Format</label>
-              <div className="flex space-x-3">
-                {[
-                  { label: 'JPEG (.jpg)', val: 'image/jpeg' },
-                  { label: 'PNG (.png)', val: 'image/png' },
-                  { label: 'WEBP (.webp)', val: 'image/webp' }
-                ].map((fmt) => (
-                  <button
-                    key={fmt.val}
-                    onClick={() => handleFormatChange(fmt.val)}
-                    className={`flex-1 py-2 text-sm font-semibold rounded-lg border transition ${
-                      outputFormat === fmt.val
-                        ? 'bg-indigo-600 text-white border-indigo-600'
-                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    {fmt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {warningMsg && (
-              <div className="flex items-center space-x-2 text-amber-700 bg-amber-50 p-3 rounded-lg text-xs">
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                <span>{warningMsg}</span>
-              </div>
-            )}
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 pt-2">
-            <button
-              onClick={() => processImage('resize')}
-              disabled={isProcessing}
-              className="flex-1 py-3 bg-gray-800 text-white rounded-xl font-bold hover:bg-gray-900 transition shadow-sm disabled:opacity-50"
-            >
-              Resize Only
-            </button>
-            <button
-              onClick={() => processImage('compress')}
-              disabled={isProcessing}
-              className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-sm disabled:opacity-50 flex items-center justify-center space-x-2"
-            >
-              <Sparkles className="w-5 h-5" />
-              <span>{isProcessing ? 'Processing...' : 'Compress & Resize'}</span>
-            </button>
-          </div>
+          <button
+            onClick={processImageTool}
+            disabled={isProcessing}
+            className="w-full py-3.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-sm disabled:opacity-50 flex items-center justify-center space-x-2"
+          >
+            <Sparkles className="w-5 h-5" />
+            <span>{isProcessing ? 'Processing Image...' : 'Execute Image Tool'}</span>
+          </button>
 
+          {/* Results Display */}
           {result && (
             <div className="mt-8 pt-6 border-t border-gray-100 space-y-6">
-              <h3 className="text-xl font-bold text-gray-900">Before & After Comparison</h3>
+              <h3 className="text-xl font-bold text-gray-900">Processed Output</h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="border border-gray-200 rounded-xl p-4 bg-gray-50">
@@ -484,15 +533,15 @@ const AdvancedCompressImage = () => {
 
                 <div className="border border-indigo-100 rounded-xl p-4 bg-indigo-50/40">
                   <span className="inline-block px-2 py-1 bg-indigo-600 text-white text-xs font-bold rounded mb-2">
-                    Processed Result
+                    Result
                   </span>
                   <div className="h-48 flex items-center justify-center bg-white rounded-lg border overflow-hidden mb-3">
-                    <img src={result.url} alt="Processed" className="max-h-full object-contain" />
+                    <img src={result.url} alt="Result" className="max-h-full object-contain" />
                   </div>
                   <div className="text-xs space-y-1 text-gray-700">
                     <p><strong>Dimensions:</strong> {result.width} × {result.height} px</p>
-                    <p><strong>New File Size:</strong> {formatBytes(result.size)}</p>
-                    <p><strong>Reduction:</strong> <span className={result.reduction > 0 ? "text-emerald-600 font-bold" : "text-amber-600"}>{result.reduction}%</span></p>
+                    <p><strong>New Size:</strong> {formatBytes(result.size)}</p>
+                    <p><strong>Difference:</strong> <span className={result.reduction > 0 ? "text-emerald-600 font-bold" : "text-amber-600"}>{result.reduction}%</span></p>
                   </div>
                 </div>
               </div>
@@ -503,7 +552,7 @@ const AdvancedCompressImage = () => {
                 className="flex items-center justify-center space-x-2 w-full py-4 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition shadow-md"
               >
                 <Download className="w-5 h-5" />
-                <span>Download Processed Image ({formatBytes(result.size)})</span>
+                <span>Download File ({formatBytes(result.size)})</span>
               </a>
             </div>
           )}
@@ -1023,8 +1072,8 @@ export default function App() {
                   <span>Back to All Tools</span>
                 </button>
 
-                {activeToolId === 'compress-image' || currentToolObj?.category === 'image' ? (
-                  <AdvancedCompressImage />
+                {currentToolObj?.category === 'image' ? (
+                  <AdvancedCompressImage toolId={activeToolId} />
                 ) : currentToolObj?.category === 'calculators' ? (
                   <UniversalCalculator toolId={activeToolId} />
                 ) : currentToolObj?.category === 'converters' ? (
