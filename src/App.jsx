@@ -6,6 +6,54 @@ import {
   Database, Flame, HardDrive, Compass, Thermometer, Box, Scale, Shield, Maximize2, Crop
 } from 'lucide-react';
 
+// --- IMAGE TOOLS DEFINITION ---
+export const IMAGE_TOOLS = [
+  { id: 'compress-image', name: 'Compress Image', description: 'Reduce image file size while maintaining quality.', keywords: ['compress', 'jpg', 'png', 'webp', 'reduce size'] },
+  { id: 'resize-image', name: 'Resize Image', description: 'Change dimensions or scale image pixels.', keywords: ['resize', 'dimensions', 'width', 'height', 'scale'] },
+  { id: 'crop-image', name: 'Crop Image', description: 'Crop custom areas from your image.', keywords: ['crop', 'trim', 'cut'] },
+  { id: 'rotate-image', name: 'Rotate Image', description: 'Rotate image by 90, 180, or 270 degrees.', keywords: ['rotate', 'turn', 'angle'] },
+  { id: 'flip-image', name: 'Flip Image', description: 'Flip image horizontally or vertically.', keywords: ['flip', 'mirror'] },
+  { id: 'jpg-to-png', name: 'JPG to PNG', description: 'Convert JPG images to PNG format.', keywords: ['jpg', 'png', 'convert'] },
+  { id: 'png-to-jpg', name: 'PNG to JPG', description: 'Convert PNG images to JPG format.', keywords: ['png', 'jpg', 'convert'] },
+  { id: 'webp-to-jpg', name: 'WEBP to JPG', description: 'Convert WEBP images to JPG format.', keywords: ['webp', 'jpg', 'convert'] },
+  { id: 'jpg-to-webp', name: 'JPG to WEBP', description: 'Convert JPG images to WebP format.', keywords: ['jpg', 'webp', 'convert'] },
+  { id: 'png-to-webp', name: 'PNG to WEBP', description: 'Convert PNG images to WebP format.', keywords: ['png', 'webp', 'convert'] },
+  { id: 'format-converter', name: 'Image Format Converter', description: 'Universal format converter (JPG, PNG, WEBP).', keywords: ['format', 'convert', 'image'] },
+  { id: 'change-dimensions', name: 'Change Dimensions', description: 'Set specific width and height in pixels.', keywords: ['dimensions', 'px', 'resize'] },
+  { id: 'resize-percentage', name: 'Resize by Percentage', description: 'Scale image size by percentage.', keywords: ['percentage', 'scale'] },
+  { id: 'resize-pixels', name: 'Resize by Pixels', description: 'Scale image resolution directly.', keywords: ['pixels', 'resolution'] },
+  { id: 'make-square', name: 'Make Image Square', description: 'Crop image into a 1:1 square aspect ratio.', keywords: ['square', '1:1', 'avatar'] },
+  { id: 'circular-crop', name: 'Circular Image Crop', description: 'Crop image into a round circular badge.', keywords: ['circle', 'round', 'profile'] },
+  { id: 'grayscale-image', name: 'Grayscale Filter', description: 'Convert colored images into black & white.', keywords: ['grayscale', 'black white', 'monochrome'] },
+  { id: 'blur-image', name: 'Blur Image', description: 'Apply privacy blur filter to your images.', keywords: ['blur', 'censor', 'filter'] },
+  { id: 'add-text-image', name: 'Add Text to Image', description: 'Overlay watermark or caption text on photos.', keywords: ['text', 'watermark', 'caption'] },
+  { id: 'remove-metadata', name: 'Remove Metadata', description: 'Strip EXIF privacy details and camera tags.', keywords: ['exif', 'metadata', 'privacy'] }
+];
+
+// --- PDF TOOLS DEFINITION ---
+export const PDF_TOOLS = [
+  { id: 'merge-pdf', name: 'Merge PDF', description: 'Combine multiple PDF files into one.', keywords: ['merge', 'combine', 'join'], supported: true },
+  { id: 'split-pdf', name: 'Split PDF', description: 'Separate pages or extract ranges into PDFs.', keywords: ['split', 'extract', 'separate'], supported: true },
+  { id: 'compress-pdf', name: 'Compress PDF', description: 'Reduce PDF file size for sharing.', keywords: ['compress', 'shrink', 'pdf'], supported: true },
+  { id: 'rotate-pdf', name: 'Rotate PDF', description: 'Rotate PDF pages orientation.', keywords: ['rotate', 'turn', 'pdf'], supported: true },
+  { id: 'delete-pdf-pages', name: 'Delete PDF Pages', description: 'Remove unwanted pages from PDF.', keywords: ['delete', 'remove', 'pages'], supported: true },
+  { id: 'extract-pdf-pages', name: 'Extract PDF Pages', description: 'Save selected pages into a new PDF.', keywords: ['extract', 'pull', 'save'], supported: true },
+  { id: 'reorder-pdf-pages', name: 'Reorder PDF Pages', description: 'Rearrange page order in your PDF.', keywords: ['reorder', 'sort', 'pages'], supported: true },
+  { id: 'add-page-numbers', name: 'Add Page Numbers', description: 'Insert page numbers into headers/footers.', keywords: ['numbers', 'pagination'], supported: true },
+  { id: 'add-watermark-pdf', name: 'Add Watermark to PDF', description: 'Stamp text watermark across pages.', keywords: ['watermark', 'stamp'], supported: true },
+  { id: 'protect-pdf', name: 'Protect PDF (Password)', description: 'Encrypt PDF with password protection.', keywords: ['password', 'encrypt', 'lock'], supported: true },
+  { id: 'unlock-pdf', name: 'Unlock PDF', description: 'Remove password protection from PDF.', keywords: ['unlock', 'decrypt'], supported: true },
+  { id: 'images-to-pdf', name: 'Images to PDF', description: 'Convert multiple images into a PDF document.', keywords: ['images', 'pdf', 'convert'], supported: true },
+  { id: 'jpg-to-pdf', name: 'JPG to PDF', description: 'Convert JPG images directly into a PDF.', keywords: ['jpg', 'pdf', 'convert'], supported: true },
+  { id: 'png-to-pdf', name: 'PNG to PDF', description: 'Convert PNG images into a PDF document.', keywords: ['png', 'pdf', 'convert'], supported: true },
+  { id: 'pdf-to-jpg', name: 'PDF to JPG', description: 'Extract pages and save as JPG images.', keywords: ['pdf', 'jpg', 'convert'], supported: true },
+  { id: 'pdf-to-png', name: 'PDF to PNG', description: 'Render PDF pages as PNG images.', keywords: ['pdf', 'png', 'convert'], supported: true },
+  { id: 'extract-pdf-text', name: 'Extract PDF Text', description: 'Extract readable plain text from PDF.', keywords: ['text', 'extract', 'read'], supported: true },
+  { id: 'add-text-pdf', name: 'Add Text to PDF', description: 'Write custom text overlays onto PDF pages.', keywords: ['annotate', 'text', 'add'], supported: true },
+  { id: 'crop-pdf', name: 'Crop PDF Pages', description: 'Trim PDF margins or crop specific areas.', keywords: ['crop', 'trim', 'margins'], supported: true },
+  { id: 'organize-pdf', name: 'Organize PDF', description: 'Manage, rotate, and sort PDF pages visually.', keywords: ['organize', 'manage'], supported: true }
+];
+
 const formatBytes = (bytes, decimals = 2) => {
   if (!bytes || bytes === 0) return '0 Bytes';
   const k = 1024;
@@ -60,49 +108,25 @@ const TOOLS = [
   { id: 'torque-conv', name: 'Torque Converter', category: 'converters', icon: 'Activity', desc: 'Convert Newton-meters, Foot-pounds, and Inch-pounds.', keywords: 'mechanic engine force rotation' },
   { id: 'number-system', name: 'Number System Converter', category: 'converters', icon: 'Cpu', desc: 'Convert Binary, Octal, Decimal, and Hexadecimal numbers.', keywords: 'hex bin oct dec programmer code' },
 
-  // --- IMAGE TOOLS (20) ---
-  { id: 'compress-image', name: 'Compress & Resize Image (Advanced)', category: 'image', icon: 'ImageIcon', desc: 'Full-featured compressor with exact pixel sizing, target file size optimization, and format conversion.', keywords: 'reduce size quality kb mb resize crop webp jpg png' },
-  { id: 'resize-image', name: 'Resize Image', category: 'image', icon: 'Maximize2', desc: 'Change dimensions or scale image by percentage quickly.', keywords: 'dimensions width height scale' },
-  { id: 'crop-image', name: 'Crop Image', category: 'image', icon: 'Crop', desc: 'Crop image custom dimensions or square/aspect ratio.', keywords: 'cut trim focus canvas' },
-  { id: 'rotate-image', name: 'Rotate Image', category: 'image', icon: 'RotateCw', desc: 'Rotate photos 90, 180, or 270 degrees clockwise.', keywords: 'turn orientation angle' },
-  { id: 'flip-image', name: 'Flip Image', category: 'image', icon: 'ImageIcon', desc: 'Flip image horizontally or vertically (mirror effect).', keywords: 'mirror flip reverse side' },
-  { id: 'jpg-to-png', name: 'JPG to PNG', category: 'image', icon: 'ImageIcon', desc: 'Convert JPG photos to lossless PNG format.', keywords: 'convert format extension photo' },
-  { id: 'png-to-jpg', name: 'PNG to JPG', category: 'image', icon: 'ImageIcon', desc: 'Convert PNG graphics into smaller JPG format.', keywords: 'convert format compression photo' },
-  { id: 'webp-to-jpg', name: 'WEBP to JPG', category: 'image', icon: 'ImageIcon', desc: 'Convert web WEBP images to standard JPG format.', keywords: 'browser format photo convert' },
-  { id: 'jpg-to-webp', name: 'JPG to WEBP', category: 'image', icon: 'ImageIcon', desc: 'Convert JPG to modern web-optimized WEBP images.', keywords: 'web speed compress speed' },
-  { id: 'png-to-webp', name: 'PNG to WEBP', category: 'image', icon: 'ImageIcon', desc: 'Convert PNG to WEBP while preserving transparency.', keywords: 'transparent alpha compression' },
-  { id: 'format-converter', name: 'Image Format Converter', category: 'image', icon: 'ImageIcon', desc: 'Universal image converter supporting JPG, PNG, WEBP.', keywords: 'universal convert export format' },
-  { id: 'change-dimensions', name: 'Change Image Dimensions', category: 'image', icon: 'Maximize2', desc: 'Set custom pixel width and height directly.', keywords: 'px width height aspect ratio' },
-  { id: 'resize-percentage', name: 'Resize Image by Percentage', category: 'image', icon: 'Percent', desc: 'Scale image up or down by 25%, 50%, 75%, 200%.', keywords: 'half double scale shrink zoom' },
-  { id: 'resize-pixels', name: 'Resize Image by Pixels', category: 'image', icon: 'Maximize2', desc: 'Precision pixel dimension scaling tool.', keywords: 'px resolution desktop mobile' },
-  { id: 'make-square', name: 'Make Image Square', category: 'image', icon: 'Crop', desc: 'Pad or crop image into 1:1 square for avatars or social media.', keywords: 'avatar instagram square profile' },
-  { id: 'circular-crop', name: 'Circular Image Crop', category: 'image', icon: 'Crop', desc: 'Crop image into a round circular badge shape.', keywords: 'round profile circle avatar icon' },
-  { id: 'grayscale-image', name: 'Grayscale Converter', category: 'image', icon: 'ImageIcon', desc: 'Turn colored photos into black and white monochrome.', keywords: 'black white mono filter classic' },
-  { id: 'blur-image', name: 'Blur Image', category: 'image', icon: 'ImageIcon', desc: 'Apply Gaussian blur privacy filter to your images.', keywords: 'censor hide background blur' },
-  { id: 'add-text-image', name: 'Add Text to Image', category: 'image', icon: 'ImageIcon', desc: 'Overlay custom text, watermark, or captions on photos.', keywords: 'caption watermark overlay title' },
-  { id: 'remove-metadata', name: 'Remove Image Metadata', category: 'image', icon: 'Shield', desc: 'Strip EXIF privacy data, camera info, and GPS coordinates.', keywords: 'exif privacy clean hide location' },
+  // --- IMAGE TOOLS (Mapped from IMAGE_TOOLS) ---
+  ...IMAGE_TOOLS.map(t => ({
+    id: t.id,
+    name: t.name,
+    category: 'image',
+    icon: 'ImageIcon',
+    desc: t.description,
+    keywords: t.keywords.join(' ')
+  })),
 
-  // --- PDF TOOLS (20) ---
-  { id: 'merge-pdf', name: 'Merge PDF', category: 'pdf', icon: 'FileText', desc: 'Combine multiple PDF files into one single document.', keywords: 'join combine attach append' },
-  { id: 'split-pdf', name: 'Split PDF', category: 'pdf', icon: 'FileText', desc: 'Separate pages or extract ranges into individual PDFs.', keywords: 'break divide pages separate' },
-  { id: 'compress-pdf', name: 'Compress PDF', category: 'pdf', icon: 'FileText', desc: 'Reduce PDF file size for easier email sharing.', keywords: 'shrink small email shrink size' },
-  { id: 'rotate-pdf', name: 'Rotate PDF', category: 'pdf', icon: 'RotateCw', desc: 'Rotate specific or all PDF pages 90, 180, or 270 degrees.', keywords: 'orientation turn vertical horizontal' },
-  { id: 'delete-pdf-pages', name: 'Delete PDF Pages', category: 'pdf', icon: 'Trash2', desc: 'Remove unwanted pages from your PDF file.', keywords: 'remove clean purge strip' },
-  { id: 'extract-pdf-pages', name: 'Extract PDF Pages', category: 'pdf', icon: 'FileText', desc: 'Save selected PDF pages into a brand new document.', keywords: 'pull pick save custom' },
-  { id: 'reorder-pdf-pages', name: 'Reorder PDF Pages', category: 'pdf', icon: 'Layers', desc: 'Drag, drop, and rearrange pages in any order.', keywords: 'organize swap sort page order' },
-  { id: 'add-page-numbers', name: 'Add Page Numbers', category: 'pdf', icon: 'FileText', desc: 'Insert customizable page numbers to header or footer.', keywords: 'footer header pagination enumerate' },
-  { id: 'add-watermark-pdf', name: 'Add Watermark to PDF', category: 'pdf', icon: 'Shield', desc: 'Stamp text watermark across document pages for protection.', keywords: 'stamp draft confidential copyright' },
-  { id: 'protect-pdf', name: 'Protect PDF (Password)', category: 'pdf', icon: 'Lock', desc: 'Encrypt PDF with password protection.', keywords: 'secure lock encrypt key' },
-  { id: 'unlock-pdf', name: 'Unlock PDF', category: 'pdf', icon: 'Unlock', desc: 'Remove user password permissions from unlocked PDFs.', keywords: 'decrypt open pass remove lock' },
-  { id: 'images-to-pdf', name: 'Images to PDF', category: 'pdf', icon: 'FileText', desc: 'Convert multiple images into a clean PDF document.', keywords: 'photo catalog scan photo document' },
-  { id: 'jpg-to-pdf', name: 'JPG to PDF', category: 'pdf', icon: 'FileText', desc: 'Convert JPG photos directly into PDF pages.', keywords: 'convert photo document scan' },
-  { id: 'png-to-pdf', name: 'PNG to PDF', category: 'pdf', icon: 'FileText', desc: 'Convert PNG graphics into formatted PDF documents.', keywords: 'convert image graphic file' },
-  { id: 'pdf-to-jpg', name: 'PDF to JPG', category: 'pdf', icon: 'FileText', desc: 'Extract PDF pages and save them as high quality JPG images.', keywords: 'convert image render export' },
-  { id: 'pdf-to-png', name: 'PDF to PNG', category: 'pdf', icon: 'FileText', desc: 'Render PDF pages into high resolution PNG images.', keywords: 'convert raster render extract' },
-  { id: 'extract-pdf-text', name: 'Extract PDF Text', category: 'pdf', icon: 'FileText', desc: 'Extract readable raw text from your PDF files.', keywords: 'copy txt parse words reader' },
-  { id: 'add-text-pdf', name: 'Add Text to PDF', category: 'pdf', icon: 'FileText', desc: 'Write and stamp custom text onto PDF pages.', keywords: 'annotate overlay subtitle caption' },
-  { id: 'crop-pdf', name: 'Crop PDF Pages', category: 'pdf', icon: 'Crop', desc: 'Trim margins or cut specific sections of PDF pages.', keywords: 'margins crop cut trim size' },
-  { id: 'organize-pdf', name: 'Organize PDF', category: 'pdf', icon: 'Layers', desc: 'Sort, rotate, delete and manage PDF pages in visual grid.', keywords: 'manage organize reorder edit view' }
+  // --- PDF TOOLS (Mapped from PDF_TOOLS) ---
+  ...PDF_TOOLS.map(t => ({
+    id: t.id,
+    name: t.name,
+    category: 'pdf',
+    icon: 'FileText',
+    desc: t.description,
+    keywords: t.keywords.join(' ')
+  }))
 ];
 
 const IconRenderer = ({ name, className = "w-5 h-5" }) => {
@@ -139,11 +163,9 @@ const AdvancedCompressImage = ({ toolId }) => {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [origInfo, setOrigInfo] = useState({ width: 0, height: 0, size: 0, type: '' });
   
-  // Options & Parameters
+  // Controls & Options
   const [width, setWidth] = useState(0);
   const [height, setHeight] = useState(0);
-  const [keepAspect, setKeepAspect] = useState(true);
-  const [aspectRatio, setAspectRatio] = useState(1);
   const [percentage, setPercentage] = useState(50);
   const [targetSizeKb, setTargetSizeKb] = useState('');
   const [quality, setQuality] = useState(80);
@@ -152,12 +174,9 @@ const AdvancedCompressImage = ({ toolId }) => {
   const [flipMode, setFlipMode] = useState('horizontal');
   const [blurRadius, setBlurRadius] = useState(4);
   const [watermarkText, setWatermarkText] = useState('');
-  const [cropX, setCropX] = useState(0);
-  const [cropY, setCropY] = useState(0);
   const [cropWidth, setCropWidth] = useState(100);
   const [cropHeight, setCropHeight] = useState(100);
   
-  const [warningMsg, setWarningMsg] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState(null);
 
@@ -165,11 +184,7 @@ const AdvancedCompressImage = ({ toolId }) => {
 
   const handleFileChange = (e) => {
     const selected = e.target.files[0];
-    if (!selected) return;
-    if (!selected.type.startsWith('image/')) {
-      alert('Please select a valid image file (JPG, PNG, WEBP).');
-      return;
-    }
+    if (!selected || !selected.type.startsWith('image/')) return;
 
     const img = new Image();
     const url = URL.createObjectURL(selected);
@@ -186,10 +201,8 @@ const AdvancedCompressImage = ({ toolId }) => {
       setHeight(img.naturalHeight);
       setCropWidth(img.naturalWidth);
       setCropHeight(img.naturalHeight);
-      setAspectRatio(img.naturalWidth / img.naturalHeight);
       setResult(null);
 
-      // Auto-set preset output format based on specific conversion tools
       if (currentTool === 'jpg-to-png') setOutputFormat('image/png');
       else if (currentTool === 'png-to-jpg' || currentTool === 'webp-to-jpg') setOutputFormat('image/jpeg');
       else if (currentTool === 'jpg-to-webp' || currentTool === 'png-to-webp') setOutputFormat('image/webp');
@@ -203,15 +216,7 @@ const AdvancedCompressImage = ({ toolId }) => {
     if (!file || !previewUrl) return;
     setIsProcessing(true);
 
-    let bitmap;
-    try {
-      bitmap = await createImageBitmap(file);
-    } catch {
-      alert('Failed to load image.');
-      setIsProcessing(false);
-      return;
-    }
-
+    const bitmap = await createImageBitmap(file);
     const sourceWidth = bitmap.width;
     const sourceHeight = bitmap.height;
 
@@ -273,8 +278,6 @@ const AdvancedCompressImage = ({ toolId }) => {
         sw = outW; sh = outH;
         sx = Math.floor((sourceWidth - sw) / 2);
         sy = Math.floor((sourceHeight - sh) / 2);
-      } else if (currentTool === 'crop-image') {
-        sx = cropX; sy = cropY; sw = cropWidth; sh = cropHeight;
       }
 
       ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, outW, outH);
@@ -327,61 +330,43 @@ const AdvancedCompressImage = ({ toolId }) => {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-8">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6">
+      <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-xl">
+        <h3 className="font-bold text-indigo-900 text-base capitalize">
+          Active Tool: {currentTool.replace(/-/g, ' ')}
+        </h3>
+      </div>
+
       <div>
-        <h3 className="text-lg font-bold text-gray-900 mb-2">1. Select or Drop Image</h3>
-        <label className="flex flex-col items-center justify-center w-full h-44 border-2 border-dashed border-indigo-200 rounded-xl cursor-pointer bg-indigo-50/30 hover:bg-indigo-50 transition">
-          <Upload className="w-10 h-10 text-indigo-500 mb-2" />
-          <span className="text-sm font-medium text-gray-700">Click to upload or drag & drop</span>
-          <span className="text-xs text-gray-500 mt-1">Supports JPG, PNG, WEBP</span>
+        <label className="flex flex-col items-center justify-center w-full h-36 border-2 border-dashed border-indigo-200 rounded-xl cursor-pointer bg-indigo-50/30 hover:bg-indigo-50 transition">
+          <Upload className="w-8 h-8 text-indigo-500 mb-1" />
+          <span className="text-sm font-medium text-gray-700">Select Image (JPG, PNG, WEBP)</span>
           <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
         </label>
       </div>
 
       {file && (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-xl text-sm">
-            <div>
-              <span className="text-gray-500 block">Original Width</span>
-              <span className="font-semibold text-gray-800">{origInfo.width} px</span>
-            </div>
-            <div>
-              <span className="text-gray-500 block">Original Height</span>
-              <span className="font-semibold text-gray-800">{origInfo.height} px</span>
-            </div>
-            <div>
-              <span className="text-gray-500 block">File Size</span>
-              <span className="font-semibold text-gray-800">{formatBytes(origInfo.size)}</span>
-            </div>
-            <div>
-              <span className="text-gray-500 block">Format</span>
-              <span className="font-semibold text-gray-800 uppercase">{origInfo.type.replace('image/', '')}</span>
-            </div>
-          </div>
-
-          {/* Dynamic Configuration Controls per Tool */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold text-gray-900">2. Tool Settings</h3>
-
+          <div className="p-4 bg-gray-50 rounded-xl space-y-4">
             {currentTool === 'resize-percentage' && (
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Resize Percentage (%)</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Scale Percentage (%)</label>
                 <input
                   type="number"
                   value={percentage}
                   onChange={(e) => setPercentage(Number(e.target.value))}
-                  className="w-full border rounded-lg p-2.5 text-sm"
+                  className="w-full border rounded-lg p-2 text-sm"
                 />
               </div>
             )}
 
             {currentTool === 'rotate-image' && (
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Rotation Angle</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Rotate Angle</label>
                 <select
                   value={rotation}
                   onChange={(e) => setRotation(Number(e.target.value))}
-                  className="w-full border rounded-lg p-2.5 text-sm bg-white"
+                  className="w-full border rounded-lg p-2 text-sm bg-white"
                 >
                   <option value={90}>90° Clockwise</option>
                   <option value={180}>180° Turn</option>
@@ -392,11 +377,11 @@ const AdvancedCompressImage = ({ toolId }) => {
 
             {currentTool === 'flip-image' && (
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Flip Axis</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Flip Direction</label>
                 <select
                   value={flipMode}
                   onChange={(e) => setFlipMode(e.target.value)}
-                  className="w-full border rounded-lg p-2.5 text-sm bg-white"
+                  className="w-full border rounded-lg p-2 text-sm bg-white"
                 >
                   <option value="horizontal">Horizontal (Mirror)</option>
                   <option value="vertical">Vertical</option>
@@ -420,50 +405,26 @@ const AdvancedCompressImage = ({ toolId }) => {
 
             {currentTool === 'add-text-image' && (
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Overlay Caption / Text</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Watermark Text</label>
                 <input
                   type="text"
-                  placeholder="Enter custom watermark text..."
+                  placeholder="Enter text overlay..."
                   value={watermarkText}
                   onChange={(e) => setWatermarkText(e.target.value)}
-                  className="w-full border rounded-lg p-2.5 text-sm"
+                  className="w-full border rounded-lg p-2 text-sm"
                 />
               </div>
             )}
 
-            {currentTool === 'crop-image' && (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Crop Width (px)</label>
-                  <input
-                    type="number"
-                    value={cropWidth}
-                    onChange={(e) => setCropWidth(Number(e.target.value))}
-                    className="w-full border rounded-lg p-2.5 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Crop Height (px)</label>
-                  <input
-                    type="number"
-                    value={cropHeight}
-                    onChange={(e) => setCropHeight(Number(e.target.value))}
-                    className="w-full border rounded-lg p-2.5 text-sm"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* General Dimension Settings */}
             {['compress-image', 'resize-image', 'change-dimensions', 'resize-pixels'].includes(currentTool) && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">Width (px)</label>
                   <input
                     type="number"
                     value={width}
                     onChange={(e) => setWidth(Number(e.target.value))}
-                    className="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full border rounded-lg p-2 text-sm"
                   />
                 </div>
                 <div>
@@ -472,35 +433,31 @@ const AdvancedCompressImage = ({ toolId }) => {
                     type="number"
                     value={height}
                     onChange={(e) => setHeight(Number(e.target.value))}
-                    className="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full border rounded-lg p-2 text-sm"
                   />
                 </div>
               </div>
             )}
 
-            {/* Target KB Compression & Format Selection */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Target File Size (Optional KB)</label>
-                <input
-                  type="number"
-                  placeholder="e.g. 200"
-                  value={targetSizeKb}
-                  onChange={(e) => setTargetSizeKb(e.target.value)}
-                  className="w-full border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Export Format</label>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Output Format & Target Size</label>
+              <div className="grid grid-cols-2 gap-3">
                 <select
                   value={outputFormat}
                   onChange={(e) => setOutputFormat(e.target.value)}
-                  className="w-full border rounded-lg p-2.5 text-sm bg-white"
+                  className="border rounded-lg p-2 text-sm bg-white"
                 >
                   <option value="image/jpeg">JPEG (.jpg)</option>
                   <option value="image/png">PNG (.png)</option>
                   <option value="image/webp">WEBP (.webp)</option>
                 </select>
+                <input
+                  type="number"
+                  placeholder="Target KB (e.g. 200)"
+                  value={targetSizeKb}
+                  onChange={(e) => setTargetSizeKb(e.target.value)}
+                  className="border rounded-lg p-2 text-sm"
+                />
               </div>
             </div>
           </div>
@@ -508,51 +465,24 @@ const AdvancedCompressImage = ({ toolId }) => {
           <button
             onClick={processImageTool}
             disabled={isProcessing}
-            className="w-full py-3.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-sm disabled:opacity-50 flex items-center justify-center space-x-2"
+            className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition"
           >
-            <Sparkles className="w-5 h-5" />
-            <span>{isProcessing ? 'Processing Image...' : 'Execute Image Tool'}</span>
+            {isProcessing ? 'Processing Image...' : 'Process Image'}
           </button>
 
-          {/* Results Display */}
           {result && (
-            <div className="mt-8 pt-6 border-t border-gray-100 space-y-6">
-              <h3 className="text-xl font-bold text-gray-900">Processed Output</h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="border border-gray-200 rounded-xl p-4 bg-gray-50">
-                  <span className="inline-block px-2 py-1 bg-gray-200 text-xs font-bold rounded mb-2">Original</span>
-                  <div className="h-48 flex items-center justify-center bg-white rounded-lg border overflow-hidden mb-3">
-                    <img src={previewUrl} alt="Original" className="max-h-full object-contain" />
-                  </div>
-                  <div className="text-xs space-y-1 text-gray-600">
-                    <p><strong>Dimensions:</strong> {origInfo.width} × {origInfo.height} px</p>
-                    <p><strong>Size:</strong> {formatBytes(origInfo.size)}</p>
-                  </div>
-                </div>
-
-                <div className="border border-indigo-100 rounded-xl p-4 bg-indigo-50/40">
-                  <span className="inline-block px-2 py-1 bg-indigo-600 text-white text-xs font-bold rounded mb-2">
-                    Result
-                  </span>
-                  <div className="h-48 flex items-center justify-center bg-white rounded-lg border overflow-hidden mb-3">
-                    <img src={result.url} alt="Result" className="max-h-full object-contain" />
-                  </div>
-                  <div className="text-xs space-y-1 text-gray-700">
-                    <p><strong>Dimensions:</strong> {result.width} × {result.height} px</p>
-                    <p><strong>New Size:</strong> {formatBytes(result.size)}</p>
-                    <p><strong>Difference:</strong> <span className={result.reduction > 0 ? "text-emerald-600 font-bold" : "text-amber-600"}>{result.reduction}%</span></p>
-                  </div>
-                </div>
+            <div className="p-4 border border-indigo-100 rounded-xl bg-indigo-50/50 space-y-3">
+              <div className="flex items-center justify-between text-xs text-gray-700">
+                <span>Dimensions: <strong>{result.width}x{result.height}px</strong></span>
+                <span>Output Size: <strong>{formatBytes(result.size)}</strong></span>
               </div>
-
               <a
                 href={result.url}
                 download={result.fileName}
-                className="flex items-center justify-center space-x-2 w-full py-4 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition shadow-md"
+                className="flex items-center justify-center space-x-2 w-full py-2.5 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition text-sm"
               >
-                <Download className="w-5 h-5" />
-                <span>Download File ({formatBytes(result.size)})</span>
+                <Download className="w-4 h-4" />
+                <span>Download Result</span>
               </a>
             </div>
           )}
@@ -814,29 +744,9 @@ const UniversalConverter = ({ toolId }) => {
   const [toUnit, setToUnit] = useState('ft');
 
   const conversions = {
-    'length-conv': {
-      m: 1,
-      km: 0.001,
-      cm: 100,
-      mm: 1000,
-      ft: 3.28084,
-      inch: 39.3701,
-      mile: 0.000621371
-    },
-    'weight-conv': {
-      kg: 1,
-      g: 1000,
-      lb: 2.20462,
-      oz: 35.274,
-      ton: 0.001
-    },
-    'storage-conv': {
-      B: 1,
-      KB: 1 / 1024,
-      MB: 1 / (1024 * 1024),
-      GB: 1 / (1024 * 1024 * 1024),
-      TB: 1 / (1024 * 1024 * 1024 * 1024)
-    }
+    'length-conv': { m: 1, km: 0.001, cm: 100, mm: 1000, ft: 3.28084, inch: 39.3701, mile: 0.000621371 },
+    'weight-conv': { kg: 1, g: 1000, lb: 2.20462, oz: 35.274, ton: 0.001 },
+    'storage-conv': { B: 1, KB: 1 / 1024, MB: 1 / (1024 * 1024), GB: 1 / (1024 * 1024 * 1024), TB: 1 / (1024 * 1024 * 1024 * 1024) }
   };
 
   const currentMap = conversions[toolId] || conversions['length-conv'];
