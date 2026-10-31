@@ -965,12 +965,38 @@ const UniversalCalculator = ({ toolId }) => {
         break;
       }
       case 'time-duration': {
-        const parse = (s) => { const m = (s || '').match(/^(\d{1,2}):(\d{2})$/); return m && +m[1] < 24 && +m[2] < 60 ? +m[1] * 60 + +m[2] : NaN; };
-        let a = parse(inputs.start), b = parse(inputs.end);
-        if (!Number.isFinite(a) || !Number.isFinite(b)) return;
-        if (b < a) b += 1440;
-        const n = b - a;
-        setResult({ output: `${Math.floor(n / 60)} hr ${n % 60} min`, note: `${fmt(n / 60)} decimal hours.` });
+        const parseTime = (str) => {
+          if (!str) return NaN;
+          const trimmed = str.trim().toUpperCase();
+          const isPm = trimmed.includes('PM');
+          const isAm = trimmed.includes('AM');
+          const cleanStr = trimmed.replace(/[A-Z]/g, '').trim();
+          const match = cleanStr.match(/^(\d{1,2}):(\d{2})$/);
+          if (!match) return NaN;
+          let hrs = parseInt(match[1], 10);
+          const mins = parseInt(match[2], 10);
+          if (hrs < 0 || hrs > 23 || mins < 0 || mins > 59) return NaN;
+          if (isPm && hrs < 12) hrs += 12;
+          if (isAm && hrs === 12) hrs = 0;
+          return hrs * 60 + mins;
+        };
+
+        let startMins = parseTime(inputs.start);
+        let endMins = parseTime(inputs.end);
+
+        if (!Number.isFinite(startMins) || !Number.isFinite(endMins)) {
+          return setResult({ error: 'Please enter valid times (e.g., "09:30 AM" or "17:15").' });
+        }
+
+        if (endMins < startMins) endMins += 1440;
+        const diff = endMins - startMins;
+        const hrs = Math.floor(diff / 60);
+        const mins = diff % 60;
+
+        setResult({ 
+          output: `${hrs} hr ${mins} min`, 
+          note: `Total elapsed time: ${fmt(diff / 60)} hours.` 
+        });
         break;
       }
       case 'average-calc': {
@@ -997,20 +1023,29 @@ const UniversalCalculator = ({ toolId }) => {
       }
       case 'scientific-calc': {
         if (!numeric(['x'])) return;
-        const x = val('x'), y = val('y');
+        const x = val('x');
+        const y = inputs.y !== undefined && inputs.y !== '' ? val('y') : 1;
+        const op = inputs.operation || 'Square root';
         let n;
-        switch (inputs.operation) {
+
+        switch (op) {
           case 'Square root': n = x >= 0 ? Math.sqrt(x) : NaN; break;
           case 'Square': n = x * x; break;
           case 'Cube': n = x ** 3; break;
-          case 'Sine (degrees)': n = Math.sin(x * Math.PI / 180); break;
-          case 'Cosine (degrees)': n = Math.cos(x * Math.PI / 180); break;
-          case 'Tangent (degrees)': n = Math.tan(x * Math.PI / 180); break;
+          case 'Sine (degrees)': n = Math.sin((x * Math.PI) / 180); break;
+          case 'Cosine (degrees)': n = Math.cos((x * Math.PI) / 180); break;
+          case 'Tangent (degrees)': n = Math.tan((x * Math.PI) / 180); break;
           case 'Natural log': n = x > 0 ? Math.log(x) : NaN; break;
           case 'Log base 10': n = x > 0 ? Math.log10(x) : NaN; break;
-          default: n = x ** (y || 1);
+          case 'Power (xʸ)': n = x ** y; break;
+          default: n = Math.sqrt(x);
         }
-        setResult({ output: Number.isFinite(n) ? fmt(n) : 'Invalid Input', note: `Operation: ${inputs.operation || 'Power'}` });
+
+        if (!Number.isFinite(n)) {
+          return setResult({ error: 'Invalid mathematical operation for the provided value.' });
+        }
+
+        setResult({ output: fmt(n), note: `Operation: ${op}` });
         break;
       }
       case 'basic-calc': {
@@ -1035,9 +1070,20 @@ const UniversalCalculator = ({ toolId }) => {
         break;
       }
       case 'savings-goal': {
-        if (!numeric(['goal', 'current', 'months']) || val('months') <= 0) return;
-        const rem = Math.max(0, val('goal') - val('current'));
-        setResult({ output: `${fmt(rem / val('months'))} per month`, note: rem === 0 ? 'Target already reached!' : 'Straight-line estimate.' });
+        if (!numeric(['goal', 'months']) || val('months') <= 0) return;
+        const current = inputs.current !== undefined && inputs.current !== '' ? val('current') : 0;
+        const goal = val('goal');
+        const months = val('months');
+
+        const remaining = Math.max(0, goal - current);
+        const monthlyNeeded = remaining / months;
+
+        setResult({
+          output: `${fmt(monthlyNeeded)} per month`,
+          note: remaining === 0 
+            ? 'Goal already reached!' 
+            : `Total remaining to save: ${fmt(remaining)} over ${months} months.`
+        });
         break;
       }
       default: {
@@ -1153,9 +1199,22 @@ const UniversalCalculator = ({ toolId }) => {
       )}
 
       {toolId === 'time-duration' && (
-        <div className="grid grid-cols-2 gap-3">
-          <input type="text" placeholder="Start Time (e.g. 09:30)" onChange={(e) => handleInputChange('start', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
-          <input type="text" placeholder="End Time (e.g. 17:15)" onChange={(e) => handleInputChange('end', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+        <div className="space-y-2">
+          <p className="text-xs text-gray-500">Format: <strong>09:30 AM</strong>, <strong>05:15 PM</strong>, or <strong>17:15</strong> (24-hour format)</p>
+          <div className="grid grid-cols-2 gap-3">
+            <input 
+              type="text" 
+              placeholder="Start Time (e.g., 09:30 AM)" 
+              onChange={(e) => handleInputChange('start', e.target.value)} 
+              className="border rounded-lg p-2.5 text-sm" 
+            />
+            <input 
+              type="text" 
+              placeholder="End Time (e.g., 05:15 PM)" 
+              onChange={(e) => handleInputChange('end', e.target.value)} 
+              className="border rounded-lg p-2.5 text-sm" 
+            />
+          </div>
         </div>
       )}
 
@@ -1185,7 +1244,7 @@ const UniversalCalculator = ({ toolId }) => {
           </select>
           <div className="grid grid-cols-2 gap-3">
             <input type="number" placeholder="Value X" onChange={(e) => handleInputChange('x', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
-            <input type="number" placeholder="Value Y (for power)" onChange={(e) => handleInputChange('y', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+            <input type="number" placeholder="Value Y (only for Power xʸ)" onChange={(e) => handleInputChange('y', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
           </div>
         </div>
       )}
