@@ -6,7 +6,7 @@ import {
   Database, Flame, HardDrive, Compass, Thermometer, Box, Scale, Shield, Maximize2, Crop
 } from 'lucide-react';
 
-// --- CONVERTER DATA & FORMULAS (from save.txt) ---
+// --- CONVERTER DATA & FORMULAS ---
 const CONVERTER_DATA = [
   ['length', 'Length', 'Convert distance and dimensions between metric and imperial units.', ['distance','meter','mile','inch','foot'], [['Millimeter',.001],['Centimeter',.01],['Meter',1],['Kilometer',1000],['Inch',.0254],['Foot',.3048],['Yard',.9144],['Mile',1609.344]]],
   ['weight', 'Weight', 'Move between everyday mass and weight units.', ['mass','kilogram','pound','ounce'], [['Milligram',.000001],['Gram',.001],['Kilogram',1],['Metric tonne',1000],['Ounce',.028349523125],['Pound',.45359237],['Stone',6.35029318]]],
@@ -1008,9 +1008,18 @@ const UniversalCalculator = ({ toolId }) => {
           case 'Tangent (degrees)': n = Math.tan(x * Math.PI / 180); break;
           case 'Natural log': n = x > 0 ? Math.log(x) : NaN; break;
           case 'Log base 10': n = x > 0 ? Math.log10(x) : NaN; break;
-          default: n = x ** y;
+          default: n = x ** (y || 1);
         }
         setResult({ output: Number.isFinite(n) ? fmt(n) : 'Invalid Input', note: `Operation: ${inputs.operation || 'Power'}` });
+        break;
+      }
+      case 'basic-calc': {
+        if (!numeric(['a', 'b'])) return;
+        const a = val('a'), b = val('b');
+        const op = inputs.operation || 'Add (+)';
+        if (op.includes('Divide') && b === 0) return setResult({ error: 'Cannot divide by zero.' });
+        const res = op.includes('Subtract') ? a - b : op.includes('Multiply') ? a * b : op.includes('Divide') ? a / b : a + b;
+        setResult({ output: fmt(res), note: `Calculation: ${a} ${op.match(/\((.)\)/)?.[1] || '+'} ${b}` });
         break;
       }
       case 'hcf-lcm': {
@@ -1088,6 +1097,61 @@ const UniversalCalculator = ({ toolId }) => {
         </div>
       )}
 
+      {toolId === 'gst-calc' && (
+        <div className="space-y-3">
+          <select onChange={(e) => handleInputChange('mode', e.target.value)} className="w-full border rounded-lg p-2.5 text-sm bg-white">
+            <option>Add tax to amount</option>
+            <option>Remove tax from total</option>
+          </select>
+          <div className="grid grid-cols-2 gap-3">
+            <input type="number" placeholder="Amount ($)" onChange={(e) => handleInputChange('amount', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+            <input type="number" placeholder="Tax Rate (%)" onChange={(e) => handleInputChange('rate', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+          </div>
+        </div>
+      )}
+
+      {toolId === 'discount-calc' && (
+        <div className="grid grid-cols-2 gap-3">
+          <input type="number" placeholder="Original Price ($)" onChange={(e) => handleInputChange('price', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+          <input type="number" placeholder="Discount (%)" onChange={(e) => handleInputChange('discount', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+        </div>
+      )}
+
+      {toolId === 'profit-loss' && (
+        <div className="grid grid-cols-2 gap-3">
+          <input type="number" placeholder="Cost Price ($)" onChange={(e) => handleInputChange('cost', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+          <input type="number" placeholder="Selling Price ($)" onChange={(e) => handleInputChange('selling', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+        </div>
+      )}
+
+      {toolId === 'salary-calc' && (
+        <div className="space-y-3">
+          <select onChange={(e) => handleInputChange('period', e.target.value)} className="w-full border rounded-lg p-2.5 text-sm bg-white">
+            <option>Year</option>
+            <option>Month</option>
+            <option>Week</option>
+            <option>Hour</option>
+          </select>
+          <div className="grid grid-cols-2 gap-3">
+            <input type="number" placeholder="Gross Salary ($)" onChange={(e) => handleInputChange('amount', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+            <input type="number" placeholder="Hours per week (e.g. 40)" onChange={(e) => handleInputChange('hours', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+          </div>
+        </div>
+      )}
+
+      {toolId === 'date-diff' && (
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Start Date</label>
+            <input type="date" onChange={(e) => handleInputChange('start', e.target.value)} className="w-full border rounded-lg p-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">End Date</label>
+            <input type="date" onChange={(e) => handleInputChange('end', e.target.value)} className="w-full border rounded-lg p-2 text-sm" />
+          </div>
+        </div>
+      )}
+
       {toolId === 'time-duration' && (
         <div className="grid grid-cols-2 gap-3">
           <input type="text" placeholder="Start Time (e.g. 09:30)" onChange={(e) => handleInputChange('start', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
@@ -1099,10 +1163,75 @@ const UniversalCalculator = ({ toolId }) => {
         <input type="text" placeholder="Numbers separated by commas (12, 18, 24)" onChange={(e) => handleInputChange('numbers', e.target.value)} className="w-full border rounded-lg p-2.5 text-sm" />
       )}
 
-      {!['percentage-calc', 'age-calc', 'bmi-calc', 'simple-interest', 'compound-interest', 'loan-emi', 'time-duration', 'average-calc'].includes(toolId) && (
+      {toolId === 'fraction-calc' && (
         <div className="grid grid-cols-2 gap-3">
-          <input type="number" placeholder="First Value" onChange={(e) => handleInputChange('a', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
-          <input type="number" placeholder="Second Value" onChange={(e) => handleInputChange('b', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+          <input type="number" placeholder="Numerator" onChange={(e) => handleInputChange('numerator', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+          <input type="number" placeholder="Denominator" onChange={(e) => handleInputChange('denominator', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+        </div>
+      )}
+
+      {toolId === 'scientific-calc' && (
+        <div className="space-y-3">
+          <select onChange={(e) => handleInputChange('operation', e.target.value)} className="w-full border rounded-lg p-2.5 text-sm bg-white">
+            <option>Square root</option>
+            <option>Square</option>
+            <option>Cube</option>
+            <option>Sine (degrees)</option>
+            <option>Cosine (degrees)</option>
+            <option>Tangent (degrees)</option>
+            <option>Natural log</option>
+            <option>Log base 10</option>
+            <option>Power (xʸ)</option>
+          </select>
+          <div className="grid grid-cols-2 gap-3">
+            <input type="number" placeholder="Value X" onChange={(e) => handleInputChange('x', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+            <input type="number" placeholder="Value Y (for power)" onChange={(e) => handleInputChange('y', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+          </div>
+        </div>
+      )}
+
+      {toolId === 'basic-calc' && (
+        <div className="space-y-3">
+          <select onChange={(e) => handleInputChange('operation', e.target.value)} className="w-full border rounded-lg p-2.5 text-sm bg-white">
+            <option>Add (+)</option>
+            <option>Subtract (−)</option>
+            <option>Multiply (×)</option>
+            <option>Divide (÷)</option>
+          </select>
+          <div className="grid grid-cols-2 gap-3">
+            <input type="number" placeholder="First Number" onChange={(e) => handleInputChange('a', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+            <input type="number" placeholder="Second Number" onChange={(e) => handleInputChange('b', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+          </div>
+        </div>
+      )}
+
+      {toolId === 'hcf-lcm' && (
+        <div className="grid grid-cols-2 gap-3">
+          <input type="number" placeholder="First Integer" onChange={(e) => handleInputChange('a', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+          <input type="number" placeholder="Second Integer" onChange={(e) => handleInputChange('b', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+        </div>
+      )}
+
+      {toolId === 'savings-goal' && (
+        <div className="grid grid-cols-3 gap-3">
+          <input type="number" placeholder="Goal ($)" onChange={(e) => handleInputChange('goal', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+          <input type="number" placeholder="Already Saved ($)" onChange={(e) => handleInputChange('current', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+          <input type="number" placeholder="Months" onChange={(e) => handleInputChange('months', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+        </div>
+      )}
+
+      {toolId === 'unit-price' && (
+        <div className="grid grid-cols-3 gap-3">
+          <input type="number" placeholder="Pack Price ($)" onChange={(e) => handleInputChange('price', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+          <input type="number" placeholder="Quantity" onChange={(e) => handleInputChange('quantity', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+          <input type="text" placeholder="Unit (g, ml)" onChange={(e) => handleInputChange('unit', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+        </div>
+      )}
+
+      {toolId === 'ratio-calc' && (
+        <div className="grid grid-cols-2 gap-3">
+          <input type="number" placeholder="First Amount" onChange={(e) => handleInputChange('a', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+          <input type="number" placeholder="Second Amount" onChange={(e) => handleInputChange('b', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
         </div>
       )}
 
