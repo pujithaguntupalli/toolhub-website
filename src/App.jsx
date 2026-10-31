@@ -1058,10 +1058,25 @@ const UniversalCalculator = ({ toolId }) => {
         break;
       }
       case 'hcf-lcm': {
-        if (!numeric(['a', 'b'])) return;
-        const gcd = (x, y) => y === 0 ? Math.abs(x) : gcd(y, x % y);
-        const g = gcd(val('a'), val('b'));
-        setResult({ output: `HCF (GCD): ${g}`, note: `LCM: ${fmt(Math.abs((val('a') / g) * val('b')))}` });
+        const ns = (inputs.numbers || '')
+          .split(/[,\s]+/)
+          .filter(Boolean)
+          .map(Number);
+
+        if (!ns.length || ns.some(n => !Number.isFinite(n) || n <= 0 || !Number.isInteger(n))) {
+          return setResult({ error: 'Please enter valid positive integers separated by commas.' });
+        }
+
+        const gcdTwo = (x, y) => (y === 0 ? Math.abs(x) : gcdTwo(y, x % y));
+        const lcmTwo = (x, y) => (x * y) / gcdTwo(x, y);
+
+        const overallHCF = ns.reduce((acc, curr) => gcdTwo(acc, curr));
+        const overallLCM = ns.reduce((acc, curr) => lcmTwo(acc, curr));
+
+        setResult({
+          output: `HCF (GCD): ${overallHCF}`,
+          note: `LCM: ${fmt(overallLCM)} | Calculated for ${ns.length} numbers: (${ns.join(', ')})`
+        });
         break;
       }
       case 'unit-price': {
@@ -1265,9 +1280,16 @@ const UniversalCalculator = ({ toolId }) => {
       )}
 
       {toolId === 'hcf-lcm' && (
-        <div className="grid grid-cols-2 gap-3">
-          <input type="number" placeholder="First Integer" onChange={(e) => handleInputChange('a', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
-          <input type="number" placeholder="Second Integer" onChange={(e) => handleInputChange('b', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+        <div className="space-y-2">
+          <label className="block text-xs font-semibold text-gray-600">
+            Enter integers separated by commas
+          </label>
+          <input 
+            type="text" 
+            placeholder="e.g., 12, 18, 24, 36" 
+            onChange={(e) => handleInputChange('numbers', e.target.value)} 
+            className="w-full border rounded-lg p-2.5 text-sm" 
+          />
         </div>
       )}
 
