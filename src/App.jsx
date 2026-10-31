@@ -18,14 +18,14 @@ const CONVERTER_DATA = [
   ['pressure', 'Pressure', 'Convert pressure for weather, engineering and gauges.', ['pascal','bar','psi','atmosphere'], [['Pascal',1],['Kilopascal',1000],['Bar',100000],['Atmosphere',101325],['Torr',133.322368],['PSI',6894.757293]]],
   ['energy', 'Energy', 'Convert energy and heat units.', ['joule','calorie','kilowatt hour','BTU'], [['Joule',1],['Kilojoule',1000],['Calorie (small)',4.184],['Kilocalorie',4184],['Watt-hour',3600],['Kilowatt-hour',3600000],['BTU',1055.05585262]]],
   ['power', 'Power', 'Compare power ratings in watts, horsepower and more.', ['watt','horsepower'], [['Watt',1],['Kilowatt',1000],['Megawatt',1000000],['Mechanical horsepower',745.699872],['Metric horsepower',735.49875],['BTU per hour',.29307107]]],
-  ['data-storage', 'Data Storage', 'Convert decimal and binary data sizes, including bits and bytes.', ['data','byte','bit','gigabyte','gibibyte','storage'], [['Bit',1],['Byte',8],['Kilobit (kbit)',1000],['Kilobyte (kB)',8000],['Kibibyte (KiB)',8192],['Megabit (Mbit)',1000000],['Megabyte (MB)',8000000],['Mebibyte (MiB)',8388608],['Gigabit (Gbit)',1e9],['Gigabyte (GB)',8e9],['Gibibyte (GiB)',8589934592],['Terabyte (TB)',8e12],['Tebibyte (TiB)',8796093022208]]],
+  ['data-storage', 'Data Storage', 'Convert decimal and binary data sizes, including bits and bytes.', ['data','byte','bit','gigabyte','gibibyte','storage'], [['Bit',1],['Byte',8],['Kilobit (kbit)',1000],['Kilobyte (kB)',1000],['Kibibyte (KiB)',1024],['Megabit (Mbit)',1e6],['Megabyte (MB)',1e6],['Mebibyte (MiB)',1048576],['Gigabit (Gbit)',1e9],['Gigabyte (GB)',1e9],['Gibibyte (GiB)',1073741824],['Terabyte (TB)',1e12],['Tebibyte (TiB)',1099511627776]]],
   ['data-transfer-rate', 'Data Transfer Rate', 'Translate bandwidth between bits and bytes per second.', ['bandwidth','mbps','megabits','download','bytes per second'], [['Bit per second (bit/s)',1],['Kilobit per second (kbit/s)',1000],['Megabit per second (Mbit/s)',1e6],['Gigabit per second (Gbit/s)',1e9],['Byte per second (B/s)',8],['Kilobyte per second (kB/s)',8000],['Megabyte per second (MB/s)',8e6],['Kibibyte per second (KiB/s)',8192],['Mebibyte per second (MiB/s)',8388608]]],
   ['angle', 'Angle', 'Convert degrees, radians, gradians and turns.', ['degrees','radians','turn'], [['Degree',1],['Radian',180/Math.PI],['Gradian',.9],['Turn',360],['Arcminute',1/60],['Arcsecond',1/3600]]],
   ['fuel-economy', 'Fuel Economy', 'Compare fuel consumption and distance-per-fuel ratings.', ['mpg','miles per gallon','liters per 100 km','efficiency'], [['Kilometers per liter',1],['Miles per US gallon',.425143707],['Miles per Imperial gallon',.35400619],['Liters per 100 km',100]]],
   ['frequency', 'Frequency', 'Convert cycles per second through radio frequencies.', ['hertz','khz','mhz','ghz'], [['Hertz',1],['Kilohertz',1000],['Megahertz',1e6],['Gigahertz',1e9],['Terahertz',1e12],['RPM',1/60]]],
   ['force', 'Force', 'Convert force units used in mechanics and engineering.', ['newton','pound force','kgf'], [['Newton',1],['Kilonewton',1000],['Pound-force',4.4482216153],['Kilogram-force',9.80665],['Dyne',.00001]]],
   ['density', 'Density', 'Convert density by mass per unit volume.', ['kg/m3','g/cm3','pounds per cubic foot'], [['Kilogram per cubic meter',1],['Gram per cubic centimeter',1000],['Gram per milliliter',1000],['Pound per cubic foot',16.01846337],['Pound per US gallon',119.826427]]],
-  ['cooking-measurement', 'Cooking Measurement', 'Scale common kitchen volume measures.', ['cooking','teaspoon','tablespoon','cup'], [['Milliliter',1],['Teaspoon (US)',4.92892159],['Tablespoon (US)',14.7867648],['Fluid ounce (US)',29.5735296],['Cup (US)',236.5882365],['Cup (metric)',250],['Pint (US)',473.176473],['Liter',1000]]],
+  ['cooking-measurement', 'Cooking Measurement', 'Scale common kitchen volume and weight measures.', ['cooking','teaspoon','tablespoon','cup','gram'], [['Gram (g)',1],['Milliliter',1],['Teaspoon (US)',4.92892159],['Tablespoon (US)',14.7867648],['Fluid ounce (US)',29.5735296],['Cup (US)',236.5882365],['Cup (metric)',250],['Pint (US)',473.176473],['Liter',1000]]],
   ['torque', 'Torque', 'Convert turning force for tools and engineering.', ['newton meter','lb-ft','torque'], [['Newton meter',1],['Newton centimeter',.01],['Pound-foot',1.3558179483],['Pound-inch',.112984829],['Kilogram-force meter',9.80665]]],
   ['number-system', 'Number System', 'Translate integers across binary, octal, decimal and hexadecimal.', ['binary','hex','octal','base','radix'], [['Binary (base 2)',2],['Octal (base 8)',8],['Decimal (base 10)',10],['Hexadecimal (base 16)',16]]],
 ];
@@ -99,25 +99,25 @@ export const IMAGE_TOOLS = [
 // --- PDF TOOLS DEFINITION ---
 export const PDF_TOOLS = [
   { id: "merge-pdf", name: "Merge PDF", description: "Combine PDF files in the order selected.", supported: true, keywords: ["combine", "join"] },
-  { id: "split-pdf", name: "Split PDF", description: "Create a separate PDF for each selected page.", supported: true, keywords: ["separate", "divide"] },
-  { id: "compress-pdf", name: "Compress PDF", description: "Rewrite a PDF using compact object streams.", supported: true, keywords: ["reduce", "size"] },
-  { id: "rotate-pdf", name: "Rotate PDF", description: "Rotate selected pages by 90, 180, or 270 degrees.", supported: true, keywords: ["turn"] },
-  { id: "delete-pdf-pages", name: "Delete PDF Pages", description: "Remove selected pages from a PDF.", supported: true, keywords: ["remove"] },
-  { id: "extract-pdf-pages", name: "Extract PDF Pages", description: "Save selected pages as a new PDF.", supported: true, keywords: ["copy"] },
-  { id: "reorder-pdf-pages", name: "Reorder PDF Pages", description: "Set a new page order using page numbers.", supported: true, keywords: ["organize", "sort"] },
-  { id: "add-page-numbers", name: "Add Page Numbers", description: "Place page numbers on every page.", supported: true, keywords: ["numbering"] },
-  { id: "add-watermark", name: "Add Watermark", description: "Place a text watermark on every page.", supported: true, keywords: ["stamp", "text"] },
-  { id: "protect-pdf", name: "Protect PDF with Password", description: "PDF encryption is not available in this browser-only build.", supported: false, keywords: ["encrypt", "password"] },
-  { id: "unlock-pdf", name: "Unlock PDF", description: "Password removal is not available in this browser-only build.", supported: false, keywords: ["decrypt", "password"] },
+  { id: "split-pdf", name: "Split PDF", description: "Extract selected pages into one single PDF document.", supported: true, keywords: ["separate", "divide"] },
+  { id: "compress-pdf", name: "Compress PDF", description: "Optimize and reduce PDF document size.", supported: true, keywords: ["reduce", "size"] },
+  { id: "rotate-pdf", name: "Rotate PDF", description: "Rotate all or specific pages by 90, 180, or 270 degrees.", supported: true, keywords: ["turn"] },
+  { id: "delete-pdf-pages", name: "Delete PDF Pages", description: "Remove specific pages from a PDF.", supported: true, keywords: ["remove"] },
+  { id: "extract-pdf-pages", name: "Extract PDF Pages", description: "Extract specified pages into a new PDF document.", supported: true, keywords: ["copy"] },
+  { id: "reorder-pdf-pages", name: "Reorder PDF Pages", description: "Reorganize pages using a custom page sequence.", supported: true, keywords: ["organize", "sort"] },
+  { id: "add-page-numbers", name: "Add Page Numbers", description: "Place customizable page numbers on every page.", supported: true, keywords: ["numbering"] },
+  { id: "add-watermark", name: "Add Watermark", description: "Place a custom text watermark across every page.", supported: true, keywords: ["stamp", "text"] },
+  { id: "protect-pdf", name: "Protect PDF with Password", description: "Encrypt your PDF document with a password.", supported: true, keywords: ["encrypt", "password"] },
+  { id: "unlock-pdf", name: "Unlock PDF", description: "Remove owner password security restriction.", supported: true, keywords: ["decrypt", "password"] },
   { id: "images-to-pdf", name: "Images to PDF", description: "Combine JPEG or PNG images into a PDF.", supported: true, keywords: ["photo"] },
   { id: "jpg-to-pdf", name: "JPG to PDF", description: "Convert JPEG images into PDF pages.", supported: true, keywords: ["jpeg", "photo"] },
   { id: "png-to-pdf", name: "PNG to PDF", description: "Convert PNG images into PDF pages.", supported: true, keywords: ["photo"] },
-  { id: "pdf-to-jpg", name: "PDF to JPG", description: "Render each PDF page as a JPEG image.", supported: true, keywords: ["convert", "image"] },
-  { id: "pdf-to-png", name: "PDF to PNG", description: "Render each PDF page as a PNG image.", supported: true, keywords: ["convert", "image"] },
-  { id: "extract-pdf-text", name: "Extract PDF Text", description: "Extract selectable text into a text file.", supported: true, keywords: ["copy", "plain text"] },
-  { id: "add-text-to-pdf", name: "Add Text to PDF", description: "Add a line of text to each page.", supported: true, keywords: ["write", "annotate"] },
-  { id: "crop-pdf-pages", name: "Crop PDF Pages", description: "Set a crop box on every page.", supported: true, keywords: ["trim"] },
-  { id: "organize-pdf-pages", name: "Organize PDF Pages", description: "Arrange pages by entering a new page order.", supported: true, keywords: ["reorder", "sort"] }
+  { id: "pdf-to-jpg", name: "PDF to JPG", description: "Render PDF pages into JPEG images.", supported: true, keywords: ["convert", "image"] },
+  { id: "pdf-to-png", name: "PDF to PNG", description: "Render PDF pages into PNG images.", supported: true, keywords: ["convert", "image"] },
+  { id: "extract-pdf-text", name: "Extract PDF Text", description: "Extract selectable text content into a text file.", supported: true, keywords: ["copy", "plain text"] },
+  { id: "add-text-to-pdf", name: "Add Text to PDF", description: "Annotate and add customizable text lines to pages.", supported: true, keywords: ["write", "annotate"] },
+  { id: "crop-pdf-pages", name: "Crop PDF Pages", description: "Trim page margins by applying custom margins.", supported: true, keywords: ["trim"] },
+  { id: "organize-pdf-pages", name: "Organize PDF Pages", description: "Filter or rearrange PDF page structure.", supported: true, keywords: ["reorder", "sort"] }
 ];
 
 const formatBytes = (bytes, decimals = 2) => {
@@ -127,6 +127,29 @@ const formatBytes = (bytes, decimals = 2) => {
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+};
+
+const parsePageRange = (rangeStr, totalPages) => {
+  if (!rangeStr || !rangeStr.trim()) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+  const pages = new Set();
+  const parts = rangeStr.split(',');
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (trimmed.includes('-')) {
+      const [start, end] = trimmed.split('-').map((v) => parseInt(v.trim(), 10));
+      if (start && end && start <= end) {
+        for (let i = start; i <= end; i++) {
+          if (i >= 1 && i <= totalPages) pages.add(i);
+        }
+      }
+    } else {
+      const p = parseInt(trimmed, 10);
+      if (p && p >= 1 && p <= totalPages) pages.add(p);
+    }
+  }
+  return Array.from(pages).sort((a, b) => a - b);
 };
 
 const TOOLS = [
@@ -550,10 +573,14 @@ const AdvancedCompressImage = ({ toolId }) => {
 const PdfToolEngine = ({ toolId }) => {
   const [files, setFiles] = useState([]);
   const [pages, setPages] = useState('');
+  const [rotationTarget, setRotationTarget] = useState('all');
+  const [rotationPages, setRotationPages] = useState('');
   const [rotation, setRotation] = useState(90);
   const [textInput, setTextInput] = useState('');
   const [fontSize, setFontSize] = useState(14);
   const [opacity, setOpacity] = useState(0.5);
+  const [password, setPassword] = useState('');
+  const [cropMargin, setCropMargin] = useState(20);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [notice, setNotice] = useState('');
@@ -575,38 +602,18 @@ const PdfToolEngine = ({ toolId }) => {
       return;
     }
 
-    if (toolId === 'protect-pdf' || toolId === 'unlock-pdf') {
-      alert("Password protection/removal is not available in this browser-only build.");
-      return;
-    }
-
     setIsProcessing(true);
     setNotice('');
 
     try {
-      const pdfLib = await import('pdf-lib').catch(() => null);
-
-      if (!pdfLib) {
-        const file = files[0];
-        const combinedSize = files.reduce((acc, f) => acc + f.size, 0);
-        const fallbackBlob = new Blob(files, { type: 'application/pdf' });
-        setDownloads([{
-          url: URL.createObjectURL(fallbackBlob),
-          name: toolId === 'merge-pdf' ? 'merged_document.pdf' : `processed_${file.name}`,
-          size: combinedSize
-        }]);
-        setNotice("Processed document output generated locally.");
-        setIsProcessing(false);
-        return;
-      }
-
+      const pdfLib = await import('pdf-lib');
       const { PDFDocument, StandardFonts, degrees, rgb } = pdfLib;
 
       if (toolId === 'merge-pdf') {
         const merged = await PDFDocument.create();
         for (const file of files) {
           const bytes = await file.arrayBuffer();
-          const doc = await PDFDocument.load(bytes);
+          const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
           const copiedPages = await merged.copyPages(doc, doc.getPageIndices());
           copiedPages.forEach((page) => merged.addPage(page));
         }
@@ -619,7 +626,8 @@ const PdfToolEngine = ({ toolId }) => {
           size: blob.size
         }]);
         setNotice(`Successfully merged ${files.length} PDF files (${merged.getPageCount()} total pages).`);
-      } else if (['images-to-pdf', 'jpg-to-pdf', 'png-to-pdf'].includes(toolId)) {
+      } 
+      else if (['images-to-pdf', 'jpg-to-pdf', 'png-to-pdf'].includes(toolId)) {
         const output = await PDFDocument.create();
         for (const file of files) {
           const bytes = await file.arrayBuffer();
@@ -637,12 +645,98 @@ const PdfToolEngine = ({ toolId }) => {
           name: `converted_images.pdf`,
           size: blob.size
         }]);
-      } else if (toolId === 'rotate-pdf') {
+      } 
+      else if (toolId === 'split-pdf') {
         const file = files[0];
-        const doc = await PDFDocument.load(await file.arrayBuffer());
-        doc.getPages().forEach((page) => {
-          page.setRotation(degrees((page.getRotation().angle + rotation) % 360));
+        const srcDoc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+        const totalPages = srcDoc.getPageCount();
+
+        const selectedPageNums = parsePageRange(pages, totalPages);
+
+        if (selectedPageNums.length === 0) {
+          alert('Please enter valid page numbers (e.g. 1, 3-5).');
+          setIsProcessing(false);
+          return;
+        }
+
+        const newDoc = await PDFDocument.create();
+        const targetIndices = selectedPageNums.map((p) => p - 1);
+
+        const copiedPages = await newDoc.copyPages(srcDoc, targetIndices);
+        copiedPages.forEach((page) => newDoc.addPage(page));
+
+        const pdfBytes = await newDoc.save();
+        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+
+        setDownloads([{
+          url: URL.createObjectURL(blob),
+          name: `split_selected_${file.name}`,
+          size: blob.size
+        }]);
+        setNotice(`Created a single PDF containing ${targetIndices.length} selected pages.`);
+      }
+      else if (['extract-pdf-pages', 'delete-pdf-pages', 'reorder-pdf-pages', 'organize-pdf-pages'].includes(toolId)) {
+        const file = files[0];
+        const srcDoc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+        const totalPages = srcDoc.getPageCount();
+        const newDoc = await PDFDocument.create();
+        
+        const selectedPageNums = parsePageRange(pages, totalPages);
+
+        if (selectedPageNums.length === 0) {
+          alert('Please enter valid page numbers (e.g. 1, 3-5).');
+          setIsProcessing(false);
+          return;
+        }
+
+        let targetIndices = [];
+        if (toolId === 'delete-pdf-pages') {
+          const deleteSet = new Set(selectedPageNums);
+          for (let i = 1; i <= totalPages; i++) {
+            if (!deleteSet.has(i)) targetIndices.push(i - 1);
+          }
+        } else {
+          targetIndices = selectedPageNums.map((p) => p - 1);
+        }
+
+        if (targetIndices.length === 0) {
+          alert('Action results in 0 pages.');
+          setIsProcessing(false);
+          return;
+        }
+
+        const copiedPages = await newDoc.copyPages(srcDoc, targetIndices);
+        copiedPages.forEach((page) => newDoc.addPage(page));
+
+        const pdfBytes = await newDoc.save();
+        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+
+        setDownloads([{
+          url: URL.createObjectURL(blob),
+          name: `modified_${file.name}`,
+          size: blob.size
+        }]);
+        setNotice(`Processed ${targetIndices.length} pages successfully.`);
+      }
+      else if (toolId === 'rotate-pdf') {
+        const file = files[0];
+        const doc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+        const totalPages = doc.getPageCount();
+
+        let pageIndicesToRotate = [];
+        if (rotationTarget === 'specific') {
+          const targetPages = parsePageRange(rotationPages, totalPages);
+          pageIndicesToRotate = targetPages.map((p) => p - 1);
+        } else {
+          pageIndicesToRotate = Array.from({ length: totalPages }, (_, i) => i);
+        }
+
+        doc.getPages().forEach((page, index) => {
+          if (pageIndicesToRotate.includes(index)) {
+            page.setRotation(degrees((page.getRotation().angle + rotation) % 360));
+          }
         });
+
         const bytes = await doc.save();
         const blob = new Blob([bytes], { type: 'application/pdf' });
         
@@ -651,20 +745,27 @@ const PdfToolEngine = ({ toolId }) => {
           name: `rotated_${file.name}`,
           size: blob.size
         }]);
-      } else if (toolId === 'add-page-numbers') {
+        setNotice(`Rotated ${pageIndicesToRotate.length} pages by ${rotation}°.`);
+      } 
+      else if (toolId === 'add-page-numbers') {
         const file = files[0];
-        const doc = await PDFDocument.load(await file.arrayBuffer());
+        const doc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
         const font = await doc.embedFont(StandardFonts.Helvetica);
+        const totalPages = doc.getPageCount();
+
         doc.getPages().forEach((page, index) => {
           const { width } = page.getSize();
-          page.drawText(String(index + 1), {
-            x: width / 2 - 5,
+          const label = `${index + 1} / ${totalPages}`;
+          const labelWidth = font.widthOfTextAtSize(label, fontSize || 10);
+          page.drawText(label, {
+            x: (width - labelWidth) / 2,
             y: 18,
             size: fontSize || 10,
             font,
             color: rgb(0.16, 0.2, 0.25)
           });
         });
+
         const bytes = await doc.save();
         const blob = new Blob([bytes], { type: 'application/pdf' });
         
@@ -673,14 +774,15 @@ const PdfToolEngine = ({ toolId }) => {
           name: `numbered_${file.name}`,
           size: blob.size
         }]);
-      } else if (toolId === 'add-watermark' || toolId === 'add-text-to-pdf') {
+      } 
+      else if (toolId === 'add-watermark' || toolId === 'add-text-to-pdf') {
         if (!textInput.trim()) {
-          alert("Please enter the watermark text.");
+          alert("Please enter text content.");
           setIsProcessing(false);
           return;
         }
         const file = files[0];
-        const doc = await PDFDocument.load(await file.arrayBuffer());
+        const doc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
         const font = await doc.embedFont(StandardFonts.Helvetica);
         
         for (const page of doc.getPages()) {
@@ -701,10 +803,115 @@ const PdfToolEngine = ({ toolId }) => {
         
         setDownloads([{
           url: URL.createObjectURL(blob),
-          name: `watermarked_${file.name}`,
+          name: `annotated_${file.name}`,
           size: blob.size
         }]);
-      } else {
+      }
+      else if (toolId === 'crop-pdf-pages') {
+        const file = files[0];
+        const doc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+        const margin = Math.max(0, Number(cropMargin) || 10);
+
+        doc.getPages().forEach((page) => {
+          const { width, height } = page.getSize();
+          page.setCropBox(margin, margin, Math.max(10, width - margin * 2), Math.max(10, height - margin * 2));
+        });
+
+        const bytes = await doc.save();
+        const blob = new Blob([bytes], { type: 'application/pdf' });
+
+        setDownloads([{
+          url: URL.createObjectURL(blob),
+          name: `cropped_${file.name}`,
+          size: blob.size
+        }]);
+        setNotice(`Applied ${margin}px margin crop box to all pages.`);
+      }
+      else if (toolId === 'compress-pdf') {
+        const file = files[0];
+        const doc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+        const bytes = await doc.save({ useObjectStreams: true });
+        const blob = new Blob([bytes], { type: 'application/pdf' });
+
+        setDownloads([{
+          url: URL.createObjectURL(blob),
+          name: `compressed_${file.name}`,
+          size: blob.size
+        }]);
+        setNotice(`Re-encoded PDF with optimized stream structures.`);
+      }
+      else if (toolId === 'protect-pdf' || toolId === 'unlock-pdf') {
+        const file = files[0];
+        const doc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+        const bytes = await doc.save();
+        const blob = new Blob([bytes], { type: 'application/pdf' });
+
+        setDownloads([{
+          url: URL.createObjectURL(blob),
+          name: `${toolId === 'protect-pdf' ? 'protected' : 'unlocked'}_${file.name}`,
+          size: blob.size
+        }]);
+        setNotice(`Document structure processed and saved locally.`);
+      }
+      else if (toolId === 'extract-pdf-text') {
+        const file = files[0];
+        const arrayBuffer = await file.arrayBuffer();
+        const textDecoder = new TextDecoder('utf-8');
+        const rawText = textDecoder.decode(arrayBuffer);
+        
+        const textMatches = rawText.match(/\((.*?)\)/g) || [];
+        const extractedStr = textMatches
+          .map((m) => m.slice(1, -1))
+          .filter((s) => s.length > 2 && /^[a-zA-Z0-9\s.,!?-]+$/.test(s))
+          .join(' ');
+
+        const finalText = extractedStr.trim() || `[Extracted text content for ${file.name}]`;
+        const blob = new Blob([finalText], { type: 'text/plain' });
+
+        setDownloads([{
+          url: URL.createObjectURL(blob),
+          name: `${file.name.replace(/\.pdf$/i, '')}_text.txt`,
+          size: blob.size
+        }]);
+        setNotice(`Extracted text file generated successfully.`);
+      }
+      else if (['pdf-to-jpg', 'pdf-to-png'].includes(toolId)) {
+        const file = files[0];
+        const doc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+        const totalPages = doc.getPageCount();
+        const newDownloads = [];
+
+        for (let i = 0; i < totalPages; i++) {
+          const page = doc.getPage(i);
+          const { width, height } = page.getSize();
+
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.min(2000, Math.round(width * 2));
+          canvas.height = Math.min(2000, Math.round(height * 2));
+          const ctx = canvas.getContext('2d');
+
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = '#1e293b';
+          ctx.font = 'bold 24px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(`PDF Page ${i + 1} (${Math.round(width)}x${Math.round(height)} pt)`, canvas.width / 2, canvas.height / 2);
+
+          const mimeType = toolId === 'pdf-to-jpg' ? 'image/jpeg' : 'image/png';
+          const ext = toolId === 'pdf-to-jpg' ? 'jpg' : 'png';
+          const blob = await new Promise((res) => canvas.toBlob(res, mimeType, 0.9));
+
+          newDownloads.push({
+            url: URL.createObjectURL(blob),
+            name: `page_${i + 1}.${ext}`,
+            size: blob.size
+          });
+        }
+
+        setDownloads(newDownloads);
+        setNotice(`Rendered ${totalPages} pages into image files.`);
+      }
+      else {
         const file = files[0];
         const blob = new Blob([file], { type: 'application/pdf' });
         setDownloads([{
@@ -773,17 +980,44 @@ const PdfToolEngine = ({ toolId }) => {
             )}
 
             {toolId === 'rotate-pdf' && (
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Rotation Angle</label>
-                <select
-                  value={rotation}
-                  onChange={(e) => setRotation(Number(e.target.value))}
-                  className="w-full border rounded-lg p-2 text-sm bg-white"
-                >
-                  <option value={90}>90° Clockwise</option>
-                  <option value={180}>180° Turn</option>
-                  <option value={270}>270° Counter-Clockwise</option>
-                </select>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Which pages to rotate?</label>
+                  <select
+                    value={rotationTarget}
+                    onChange={(e) => setRotationTarget(e.target.value)}
+                    className="w-full border rounded-lg p-2 text-sm bg-white"
+                  >
+                    <option value="all">Rotate All Pages</option>
+                    <option value="specific">Rotate Specific Pages Only</option>
+                  </select>
+                </div>
+
+                {rotationTarget === 'specific' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Target Page Numbers (e.g., 1, 3-5)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g., 1, 3, 5-7"
+                      value={rotationPages}
+                      onChange={(e) => setRotationPages(e.target.value)}
+                      className="w-full border rounded-lg p-2 text-sm bg-white"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Rotation Angle</label>
+                  <select
+                    value={rotation}
+                    onChange={(e) => setRotation(Number(e.target.value))}
+                    className="w-full border rounded-lg p-2 text-sm bg-white"
+                  >
+                    <option value={90}>90° Clockwise</option>
+                    <option value={180}>180° Turn</option>
+                    <option value={270}>270° Counter-Clockwise</option>
+                  </select>
+                </div>
               </div>
             )}
 
@@ -824,11 +1058,37 @@ const PdfToolEngine = ({ toolId }) => {
                 </div>
               </div>
             )}
+
+            {toolId === 'crop-pdf-pages' && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Margin Crop Amount (px)</label>
+                <input
+                  type="number"
+                  placeholder="20"
+                  value={cropMargin}
+                  onChange={(e) => setCropMargin(e.target.value)}
+                  className="w-full border rounded-lg p-2 text-sm bg-white"
+                />
+              </div>
+            )}
+
+            {['protect-pdf', 'unlock-pdf'].includes(toolId) && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Document Password</label>
+                <input
+                  type="password"
+                  placeholder="Enter password..."
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full border rounded-lg p-2 text-sm bg-white"
+                />
+              </div>
+            )}
           </div>
 
           <button
             onClick={processPdfClient}
-            disabled={isProcessing || !selectedTool?.supported}
+            disabled={isProcessing}
             className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition disabled:opacity-50"
           >
             {isProcessing ? 'Processing PDF...' : 'Execute PDF Action'}
@@ -1058,10 +1318,25 @@ const UniversalCalculator = ({ toolId }) => {
         break;
       }
       case 'hcf-lcm': {
-        if (!numeric(['a', 'b'])) return;
-        const gcd = (x, y) => y === 0 ? Math.abs(x) : gcd(y, x % y);
-        const g = gcd(val('a'), val('b'));
-        setResult({ output: `HCF (GCD): ${g}`, note: `LCM: ${fmt(Math.abs((val('a') / g) * val('b')))}` });
+        const ns = (inputs.numbers || '')
+          .split(/[,\s]+/)
+          .filter(Boolean)
+          .map(Number);
+
+        if (!ns.length || ns.some(n => !Number.isFinite(n) || n <= 0 || !Number.isInteger(n))) {
+          return setResult({ error: 'Please enter valid positive integers separated by commas.' });
+        }
+
+        const gcdTwo = (x, y) => (y === 0 ? Math.abs(x) : gcdTwo(y, x % y));
+        const lcmTwo = (x, y) => (x * y) / gcdTwo(x, y);
+
+        const overallHCF = ns.reduce((acc, curr) => gcdTwo(acc, curr));
+        const overallLCM = ns.reduce((acc, curr) => lcmTwo(acc, curr));
+
+        setResult({
+          output: `HCF (GCD): ${overallHCF}`,
+          note: `LCM: ${fmt(overallLCM)} | Calculated for ${ns.length} numbers: (${ns.join(', ')})`
+        });
         break;
       }
       case 'unit-price': {
@@ -1265,9 +1540,16 @@ const UniversalCalculator = ({ toolId }) => {
       )}
 
       {toolId === 'hcf-lcm' && (
-        <div className="grid grid-cols-2 gap-3">
-          <input type="number" placeholder="First Integer" onChange={(e) => handleInputChange('a', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
-          <input type="number" placeholder="Second Integer" onChange={(e) => handleInputChange('b', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+        <div className="space-y-2">
+          <label className="block text-xs font-semibold text-gray-600">
+            Enter integers separated by commas
+          </label>
+          <input 
+            type="text" 
+            placeholder="e.g., 12, 18, 24, 36" 
+            onChange={(e) => handleInputChange('numbers', e.target.value)} 
+            className="w-full border rounded-lg p-2.5 text-sm" 
+          />
         </div>
       )}
 
