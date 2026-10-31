@@ -646,36 +646,7 @@ const PdfToolEngine = ({ toolId }) => {
           size: blob.size
         }]);
       } 
-      else if (toolId === 'split-pdf') {
-        const file = files[0];
-        const srcDoc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
-        const totalPages = srcDoc.getPageCount();
-
-        const selectedPageNums = parsePageRange(pages, totalPages);
-
-        if (selectedPageNums.length === 0) {
-          alert('Please enter valid page numbers (e.g. 1, 3-5).');
-          setIsProcessing(false);
-          return;
-        }
-
-        const newDoc = await PDFDocument.create();
-        const targetIndices = selectedPageNums.map((p) => p - 1);
-
-        const copiedPages = await newDoc.copyPages(srcDoc, targetIndices);
-        copiedPages.forEach((page) => newDoc.addPage(page));
-
-        const pdfBytes = await newDoc.save();
-        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-
-        setDownloads([{
-          url: URL.createObjectURL(blob),
-          name: `split_selected_${file.name}`,
-          size: blob.size
-        }]);
-        setNotice(`Created a single PDF containing ${targetIndices.length} selected pages.`);
-      }
-      else if (['extract-pdf-pages', 'delete-pdf-pages', 'reorder-pdf-pages', 'organize-pdf-pages'].includes(toolId)) {
+      else if (['split-pdf', 'extract-pdf-pages', 'delete-pdf-pages', 'reorder-pdf-pages', 'organize-pdf-pages'].includes(toolId)) {
         const file = files[0];
         const srcDoc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
         const totalPages = srcDoc.getPageCount();
@@ -708,15 +679,15 @@ const PdfToolEngine = ({ toolId }) => {
         const copiedPages = await newDoc.copyPages(srcDoc, targetIndices);
         copiedPages.forEach((page) => newDoc.addPage(page));
 
-        const pdfBytes = await newDoc.save();
+        const pdfBytes = await newDoc.save({ useObjectStreams: true });
         const blob = new Blob([pdfBytes], { type: 'application/pdf' });
 
         setDownloads([{
           url: URL.createObjectURL(blob),
-          name: `modified_${file.name}`,
+          name: `${toolId === 'split-pdf' ? 'split' : 'extracted'}_${file.name}`,
           size: blob.size
         }]);
-        setNotice(`Processed ${targetIndices.length} pages successfully.`);
+        setNotice(`Processed ${targetIndices.length} pages into a new PDF document.`);
       }
       else if (toolId === 'rotate-pdf') {
         const file = files[0];
@@ -829,8 +800,16 @@ const PdfToolEngine = ({ toolId }) => {
       }
       else if (toolId === 'compress-pdf') {
         const file = files[0];
-        const doc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
-        const bytes = await doc.save({ useObjectStreams: true });
+        const srcDoc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+        const totalPages = srcDoc.getPageCount();
+        const compressedDoc = await PDFDocument.create();
+
+        // Strip structural metadata, unreferenced objects, and rebuild objects cleanly
+        const indices = Array.from({ length: totalPages }, (_, i) => i);
+        const copiedPages = await compressedDoc.copyPages(srcDoc, indices);
+        copiedPages.forEach((p) => compressedDoc.addPage(p));
+
+        const bytes = await compressedDoc.save({ useObjectStreams: true, addDefaultPage: false });
         const blob = new Blob([bytes], { type: 'application/pdf' });
 
         setDownloads([{
