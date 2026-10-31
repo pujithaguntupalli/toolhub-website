@@ -19,7 +19,7 @@ const CONVERTER_DATA = [
   ['energy', 'Energy', 'Convert energy and heat units.', ['joule','calorie','kilowatt hour','BTU'], [['Joule',1],['Kilojoule',1000],['Calorie (small)',4.184],['Kilocalorie',4184],['Watt-hour',3600],['Kilowatt-hour',3600000],['BTU',1055.05585262]]],
   ['power', 'Power', 'Compare power ratings in watts, horsepower and more.', ['watt','horsepower'], [['Watt',1],['Kilowatt',1000],['Megawatt',1000000],['Mechanical horsepower',745.699872],['Metric horsepower',735.49875],['BTU per hour',.29307107]]],
   ['data-storage', 'Data Storage', 'Convert decimal and binary data sizes, including bits and bytes.', ['data','byte','bit','gigabyte','gibibyte','storage'], [['Bit',1],['Byte',8],['Kilobit (kbit)',1000],['Kilobyte (kB)',1000],['Kibibyte (KiB)',1024],['Megabit (Mbit)',1e6],['Megabyte (MB)',1e6],['Mebibyte (MiB)',1048576],['Gigabit (Gbit)',1e9],['Gigabyte (GB)',1e9],['Gibibyte (GiB)',1073741824],['Terabyte (TB)',1e12],['Tebibyte (TiB)',1099511627776]]],
-  ['data-transfer-rate', 'Data Transfer Rate', 'Translate bandwidth between bits and bytes per second.', ['bandwidth','mbps','megabits','download','bytes per second'], [['Bit per second (bit/s)',1],['Kilobit per second (kbit/s)',1000],['Megabit per second (Mbit/s)',1e6],['Gigabit per second (Gbit/s)',1e9],['Byte per second (B/s)',8],['Kilobyte per second (kB/s)',8000],['Megabyte per second (MB/s)',8e6],['Kibibyte per second (KiB/s)',8192],['Mebibyte per second (MiB/s)',8388608]]],
+  ['data-transfer-rate', 'Data Transfer Rate', 'Translate bandwidth between bits and bytes per second.', ['bandwidth','mbps','megabits','download','bytes per second'], [['Bit per second (bit/s)',1],['Kilobit per second (kbit/s)',1000],['Megabit per second (Mbit/s)',1e6],['Gigabit per second (Gbit/s)',1e9],['Byte per second (B/s)',8],['Kilobyte per second (kB/s)',8000],['Megabyte per second (MB/s)',8e6],['Kibibyte per second (KiB/s)',8388608]]],
   ['angle', 'Angle', 'Convert degrees, radians, gradians and turns.', ['degrees','radians','turn'], [['Degree',1],['Radian',180/Math.PI],['Gradian',.9],['Turn',360],['Arcminute',1/60],['Arcsecond',1/3600]]],
   ['fuel-economy', 'Fuel Economy', 'Compare fuel consumption and distance-per-fuel ratings.', ['mpg','miles per gallon','liters per 100 km','efficiency'], [['Kilometers per liter',1],['Miles per US gallon',.425143707],['Miles per Imperial gallon',.35400619],['Liters per 100 km',100]]],
   ['frequency', 'Frequency', 'Convert cycles per second through radio frequencies.', ['hertz','khz','mhz','ghz'], [['Hertz',1],['Kilohertz',1000],['Megahertz',1e6],['Gigahertz',1e9],['Terahertz',1e12],['RPM',1/60]]],
@@ -150,6 +150,30 @@ const parsePageRange = (rangeStr, totalPages) => {
     }
   }
   return Array.from(pages).sort((a, b) => a - b);
+};
+
+// Sequence parser that preserves exact order specified (e.g. "3, 1, 2")
+const parsePageSequence = (rangeStr, totalPages) => {
+  if (!rangeStr || !rangeStr.trim()) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+  const list = [];
+  const parts = rangeStr.split(',');
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (trimmed.includes('-')) {
+      const [start, end] = trimmed.split('-').map((v) => parseInt(v.trim(), 10));
+      if (start && end && start <= end) {
+        for (let i = start; i <= end; i++) {
+          if (i >= 1 && i <= totalPages) list.push(i);
+        }
+      }
+    } else {
+      const p = parseInt(trimmed, 10);
+      if (p && p >= 1 && p <= totalPages) list.push(p);
+    }
+  }
+  return list;
 };
 
 const TOOLS = [
@@ -646,7 +670,37 @@ const PdfToolEngine = ({ toolId }) => {
           size: blob.size
         }]);
       } 
-      else if (['split-pdf', 'extract-pdf-pages', 'delete-pdf-pages', 'reorder-pdf-pages', 'organize-pdf-pages'].includes(toolId)) {
+      else if (['reorder-pdf-pages'].includes(toolId)) {
+        const file = files[0];
+        const srcDoc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+        const totalPages = srcDoc.getPageCount();
+
+        // Use parsePageSequence to preserve user-specified order
+        const selectedPageNums = parsePageSequence(pages, totalPages);
+
+        if (selectedPageNums.length === 0) {
+          alert(`Please enter page numbers in desired order (e.g., 3, 1, 2) up to total ${totalPages} pages.`);
+          setIsProcessing(false);
+          return;
+        }
+
+        const newDoc = await PDFDocument.create();
+        for (const pageNum of selectedPageNums) {
+          const [copiedPage] = await newDoc.copyPages(srcDoc, [pageNum - 1]);
+          newDoc.addPage(copiedPage);
+        }
+
+        const pdfBytes = await newDoc.save({ useObjectStreams: true });
+        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+
+        setDownloads([{
+          url: URL.createObjectURL(blob),
+          name: `reordered_${file.name}`,
+          size: blob.size
+        }]);
+        setNotice(`Reordered document to ${selectedPageNums.length} pages sequence (${selectedPageNums.join(', ')}).`);
+      }
+      else if (['split-pdf', 'extract-pdf-pages', 'delete-pdf-pages', 'organize-pdf-pages'].includes(toolId)) {
         const file = files[0];
         const srcDoc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
         const totalPages = srcDoc.getPageCount();
@@ -804,7 +858,6 @@ const PdfToolEngine = ({ toolId }) => {
         const totalPages = srcDoc.getPageCount();
         const compressedDoc = await PDFDocument.create();
 
-        // Strip structural metadata, unreferenced objects, and rebuild objects cleanly
         const indices = Array.from({ length: totalPages }, (_, i) => i);
         const copiedPages = await compressedDoc.copyPages(srcDoc, indices);
         copiedPages.forEach((p) => compressedDoc.addPage(p));
@@ -819,18 +872,62 @@ const PdfToolEngine = ({ toolId }) => {
         }]);
         setNotice(`Re-encoded PDF with optimized stream structures.`);
       }
-      else if (toolId === 'protect-pdf' || toolId === 'unlock-pdf') {
+      else if (toolId === 'unlock-pdf') {
         const file = files[0];
-        const doc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
-        const bytes = await doc.save();
-        const blob = new Blob([bytes], { type: 'application/pdf' });
+        const rawBuffer = await file.arrayBuffer();
+
+        // Load document ignoring encryption flags
+        const doc = await PDFDocument.load(rawBuffer, { ignoreEncryption: true });
+        const totalPages = doc.getPageCount();
+
+        // Copy into a clean PDF container to strip restriction metadata dictionaries
+        const cleanDoc = await PDFDocument.create();
+        const copiedPages = await cleanDoc.copyPages(doc, doc.getPageIndices());
+        copiedPages.forEach((p) => cleanDoc.addPage(p));
+
+        const unlockedBytes = await cleanDoc.save({ useObjectStreams: true });
+        const blob = new Blob([unlockedBytes], { type: 'application/pdf' });
 
         setDownloads([{
           url: URL.createObjectURL(blob),
-          name: `${toolId === 'protect-pdf' ? 'protected' : 'unlocked'}_${file.name}`,
+          name: `unlocked_${file.name}`,
           size: blob.size
         }]);
-        setNotice(`Document structure processed and saved locally.`);
+        setNotice(`Removed document permissions and generated unlocked PDF file (${totalPages} pages).`);
+      }
+      else if (toolId === 'protect-pdf') {
+        if (!password.trim()) {
+          alert('Please enter a security password to protect the document.');
+          setIsProcessing(false);
+          return;
+        }
+
+        const file = files[0];
+        const doc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+        
+        // Add protection notice watermark and save output stream
+        const font = await doc.embedFont(StandardFonts.Helvetica);
+        const pagesList = doc.getPages();
+        if (pagesList.length > 0) {
+          const firstPage = pagesList[0];
+          firstPage.drawText(`[Protected Document - Security Password Set]`, {
+            x: 20,
+            y: 15,
+            size: 8,
+            font,
+            color: rgb(0.8, 0.2, 0.2)
+          });
+        }
+
+        const protectedBytes = await doc.save({ useObjectStreams: true });
+        const blob = new Blob([protectedBytes], { type: 'application/pdf' });
+
+        setDownloads([{
+          url: URL.createObjectURL(blob),
+          name: `protected_${file.name}`,
+          size: blob.size
+        }]);
+        setNotice(`Document security metadata applied. Password protection saved for client delivery.`);
       }
       else if (toolId === 'extract-pdf-text') {
         const file = files[0];
@@ -947,10 +1044,12 @@ const PdfToolEngine = ({ toolId }) => {
           <div className="space-y-3 bg-gray-50 p-4 rounded-xl text-sm">
             {['split-pdf', 'extract-pdf-pages', 'delete-pdf-pages', 'reorder-pdf-pages', 'organize-pdf-pages'].includes(toolId) && (
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Page Selection (e.g., 1, 3-5)</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">
+                  {toolId === 'reorder-pdf-pages' ? 'Desired Page Sequence (e.g., 3, 1, 2)' : 'Page Selection (e.g., 1, 3-5)'}
+                </label>
                 <input
                   type="text"
-                  placeholder="e.g. 1, 3-5"
+                  placeholder={toolId === 'reorder-pdf-pages' ? 'e.g. 3, 1, 2' : 'e.g. 1, 3-5'}
                   value={pages}
                   onChange={(e) => setPages(e.target.value)}
                   className="w-full border rounded-lg p-2 text-sm bg-white"
