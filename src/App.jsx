@@ -354,11 +354,13 @@ const AdvancedCompressImage = ({ toolId }) => {
       setHeight(minDim);
     } else if (ratio === '16:9') {
       if (origInfo.width >= origInfo.height) {
+        const targetH = Math.round((origInfo.width * 9) / 16);
         setWidth(origInfo.width);
-        setHeight(Math.round((origInfo.width * 9) / 16));
+        setHeight(targetH);
       } else {
+        const targetW = Math.round((origInfo.height * 16) / 9);
+        setWidth(targetW);
         setHeight(origInfo.height);
-        setWidth(Math.round((origInfo.height * 9) / 16));
       }
     } else if (ratio === '4:3') {
       if (origInfo.width >= origInfo.height) {
@@ -371,11 +373,11 @@ const AdvancedCompressImage = ({ toolId }) => {
           setHeight(Math.round((origInfo.width * 3) / 4));
         }
       } else {
-        setHeight(origInfo.height);
         setWidth(Math.round((origInfo.height * 4) / 3));
+        setHeight(origInfo.height);
       }
     } else {
-      // 'Original'
+      // 'Original' resets back to original image dimensions
       setWidth(origInfo.width);
       setHeight(origInfo.height);
     }
