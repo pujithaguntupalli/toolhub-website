@@ -3,7 +3,7 @@ import {
   Search, Calculator, ArrowRightLeft, FileText, Image as ImageIcon, 
   Download, Upload, Trash2, RotateCw, Sparkles, AlertCircle, ChevronRight,
   Layers, Lock, Unlock, ArrowLeft, Star, Clock, Percent, Volume2, Cpu,
-  Database, Flame, HardDrive, Compass, Thermometer, Box, Scale, Shield, Maximize2, Crop, CheckCircle2, Grid, ZoomIn, ZoomOut, RefreshCw, FlipHorizontal, FlipVertical, FileCheck
+  Database, Flame, HardDrive, Compass, Thermometer, Box, Scale, Shield, Maximize2, Crop, CheckCircle2, Grid, ZoomIn, ZoomOut, RefreshCw, FlipHorizontal, FlipVertical, FileCheck, Circle
 } from 'lucide-react';
 
 // --- CONVERTER DATA & FORMULAS ---
@@ -83,8 +83,8 @@ export const IMAGE_TOOLS = [
   { id: 'change-dimensions', name: 'Change Dimensions', description: 'Set specific width and height in pixels.', keywords: ['dimensions', 'px', 'resize'] },
   { id: 'resize-percentage', name: 'Resize by Percentage', description: 'Scale image size by percentage.', keywords: ['percentage', 'scale'] },
   { id: 'resize-pixels', name: 'Resize by Pixels', description: 'Scale image resolution directly.', keywords: ['pixels', 'resolution'] },
-  { id: 'make-square', name: 'Make Image Square', description: 'Crop image into a 1:1 square aspect ratio.', keywords: ['square', '1:1', 'avatar'] },
-  { id: 'circular-crop', name: 'Circular Image Crop', description: 'Crop image into a round circular badge.', keywords: ['circle', 'round', 'profile'] },
+  { id: 'make-square', name: 'Make Image Square', description: 'Crop or frame image into a 1:1 square ratio with crop, pad or blur options.', keywords: ['square', '1:1', 'avatar', 'pad', 'center crop'] },
+  { id: 'circular-crop', name: 'Circular Image Crop', description: 'Crop image into a round circular badge with transparent corners.', keywords: ['circle', 'round', 'profile', 'avatar', 'badge'] },
   { id: 'grayscale-image', name: 'Grayscale Filter', description: 'Convert colored images into black & white.', keywords: ['grayscale', 'black white', 'monochrome'] },
   { id: 'blur-image', name: 'Blur Image', description: 'Apply privacy blur filter to your images.', keywords: ['blur', 'censor', 'filter'] },
   { id: 'add-text-image', name: 'Add Text to Image', description: 'Overlay watermark or caption text on photos.', keywords: ['text', 'watermark', 'caption'] },
@@ -263,13 +263,24 @@ const AdvancedCompressImage = ({ toolId }) => {
   const [pctVal, setPctVal] = useState(50);
   const [keepAspectRatio, setKeepAspectRatio] = useState(true);
   const [quality, setQuality] = useState(85);
-  const [outputFormat, setOutputFormat] = useState('image/jpeg');
+  const [outputFormat, setOutputFormat] = useState(toolId === 'circular-crop' ? 'image/png' : 'image/jpeg');
+
+  // --- MAKE SQUARE SPECIFIC STATES ---
+  const [squareMode, setSquareMode] = useState('crop'); // 'crop', 'pad-white', 'pad-black', 'pad-blur'
+  const [squareOffset, setSquareOffset] = useState(50); // 0% to 100% position shift
+
+  // --- CIRCULAR CROP SPECIFIC STATES ---
+  const [circleScale, setCircleScale] = useState(80); // % scale of circle relative to min dimension
+  const [circleCenterX, setCircleCenterX] = useState(50); // % center offset X
+  const [circleCenterY, setCircleCenterY] = useState(50); // % center offset Y
 
   useEffect(() => {
     if (toolId === 'resize-percentage') {
       setResizeMode('%');
     } else if (toolId === 'resize-pixels' || toolId === 'change-dimensions') {
       setResizeMode('px');
+    } else if (toolId === 'circular-crop') {
+      setOutputFormat('image/png');
     }
   }, [toolId]);
 
@@ -316,6 +327,15 @@ const AdvancedCompressImage = ({ toolId }) => {
     } else if (currentTool === 'resize-percentage' || resizeMode === '%') {
       targetW = Math.round(activeInfo.width * (pctVal / 100));
       targetH = Math.round(activeInfo.height * (pctVal / 100));
+    } else if (currentTool === 'make-square') {
+      const maxDim = Math.max(activeInfo.width, activeInfo.height);
+      const minDim = Math.min(activeInfo.width, activeInfo.height);
+      targetW = squareMode.startsWith('pad') ? maxDim : minDim;
+      targetH = targetW;
+    } else if (currentTool === 'circular-crop') {
+      const circleDiam = Math.round(Math.min(activeInfo.width, activeInfo.height) * (circleScale / 100));
+      targetW = circleDiam;
+      targetH = circleDiam;
     }
 
     const areaRatio = (targetW * targetH) / (activeInfo.width * activeInfo.height);
@@ -323,7 +343,7 @@ const AdvancedCompressImage = ({ toolId }) => {
     const formatMultiplier = selectedFormat === 'image/png' ? 1.2 : selectedFormat === 'image/webp' ? 0.7 : 0.85;
     const estimated = activeInfo.size * areaRatio * (quality / 100) * formatMultiplier;
     return Math.max(1024, Math.round(estimated));
-  }, [activeInfo, width, height, pctVal, cropBox, quality, currentTool, resizeMode, targetFormat, outputFormat]);
+  }, [activeInfo, width, height, pctVal, cropBox, quality, currentTool, resizeMode, targetFormat, outputFormat, squareMode, circleScale]);
 
   const handleFilesChange = (e) => {
     const selected = Array.from(e.target.files).filter((f) => f.type.startsWith('image/'));
@@ -496,8 +516,14 @@ const AdvancedCompressImage = ({ toolId }) => {
       } else if (currentTool === 'crop-image') {
         renderW = Math.round((sourceW * cropBox.w) / 100);
         renderH = Math.round((sourceH * cropBox.h) / 100);
-      } else if (currentTool === 'make-square' || currentTool === 'circular-crop') {
-        renderW = Math.min(sourceW, sourceH);
+      } else if (currentTool === 'make-square') {
+        const maxDim = Math.max(sourceW, sourceH);
+        const minDim = Math.min(sourceW, sourceH);
+        renderW = squareMode.startsWith('pad') ? maxDim : minDim;
+        renderH = renderW;
+      } else if (currentTool === 'circular-crop') {
+        const baseMin = Math.min(sourceW, sourceH);
+        renderW = Math.round(baseMin * (circleScale / 100));
         renderH = renderW;
       }
 
@@ -514,7 +540,7 @@ const AdvancedCompressImage = ({ toolId }) => {
       canvas.height = renderH;
       const ctx = canvas.getContext('2d');
 
-      if (effectiveFormat === 'image/jpeg') {
+      if (effectiveFormat === 'image/jpeg' && currentTool !== 'circular-crop') {
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, renderW, renderH);
       }
@@ -522,7 +548,70 @@ const AdvancedCompressImage = ({ toolId }) => {
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
 
-      if (currentTool === 'flip-image' && flipScope === 'selective') {
+      // --- DEDICATED MAKE SQUARE LOGIC ---
+      if (currentTool === 'make-square') {
+        const side = renderW;
+
+        if (squareMode === 'crop') {
+          // Center 1:1 Crop with position offset slider
+          const offsetFrac = squareOffset / 100;
+          let sx = 0, sy = 0, sw = sourceW, sh = sourceH;
+
+          if (sourceW > sourceH) {
+            sw = sourceH;
+            sx = Math.round((sourceW - sourceH) * offsetFrac);
+          } else {
+            sh = sourceW;
+            sy = Math.round((sourceH - sourceW) * offsetFrac);
+          }
+          ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, side, side);
+        } else {
+          // Padding modes (White, Black, or Blur)
+          if (squareMode === 'pad-white') {
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, side, side);
+          } else if (squareMode === 'pad-black') {
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, side, side);
+          } else if (squareMode === 'pad-blur') {
+            ctx.save();
+            ctx.filter = 'blur(30px)';
+            ctx.drawImage(bitmap, -side * 0.1, -side * 0.1, side * 1.2, side * 1.2);
+            ctx.restore();
+          }
+
+          // Draw un-cropped centered original inside padded frame
+          const scale = side / Math.max(sourceW, sourceH);
+          const drawW = Math.round(sourceW * scale);
+          const drawH = Math.round(sourceH * scale);
+          const dx = Math.round((side - drawW) / 2);
+          const dy = Math.round((side - drawH) / 2);
+          ctx.drawImage(bitmap, 0, 0, sourceW, sourceH, dx, dy, drawW, drawH);
+        }
+      } 
+      // --- DEDICATED CIRCULAR CROP LOGIC ---
+      else if (currentTool === 'circular-crop') {
+        const circleDiam = renderW;
+        ctx.clearRect(0, 0, circleDiam, circleDiam);
+
+        // Apply Circular Clipping Path
+        ctx.beginPath();
+        ctx.arc(circleDiam / 2, circleDiam / 2, circleDiam / 2, 0, Math.PI * 2);
+        ctx.clip();
+
+        // Calculate source cropping region based on position offsets
+        const baseMin = Math.min(sourceW, sourceH);
+        const cropDim = Math.round(baseMin * (circleScale / 100));
+
+        const maxOffsetX = sourceW - cropDim;
+        const maxOffsetY = sourceH - cropDim;
+
+        const sx = Math.max(0, Math.min(maxOffsetX, Math.round(maxOffsetX * (circleCenterX / 100))));
+        const sy = Math.max(0, Math.min(maxOffsetY, Math.round(maxOffsetY * (circleCenterY / 100))));
+
+        ctx.drawImage(bitmap, sx, sy, cropDim, cropDim, 0, 0, circleDiam, circleDiam);
+      } 
+      else if (currentTool === 'flip-image' && flipScope === 'selective') {
         ctx.drawImage(bitmap, 0, 0, sourceW, sourceH, 0, 0, renderW, renderH);
 
         const srcX = Math.round((sourceW * cropBox.x) / 100);
@@ -544,13 +633,6 @@ const AdvancedCompressImage = ({ toolId }) => {
         ctx.scale(scaleX, scaleY);
         ctx.drawImage(bitmap, srcX, srcY, srcW, srcH, -srcW / 2, -srcH / 2, srcW, srcH);
         ctx.restore();
-      } else if (currentTool === 'circular-crop') {
-        ctx.beginPath();
-        ctx.arc(renderW / 2, renderH / 2, renderW / 2, 0, Math.PI * 2);
-        ctx.clip();
-        const sx = Math.floor((sourceW - renderW) / 2);
-        const sy = Math.floor((sourceH - renderH) / 2);
-        ctx.drawImage(bitmap, sx, sy, renderW, renderH, 0, 0, renderW, renderH);
       } else {
         if (currentTool === 'grayscale-image') ctx.filter = 'grayscale(1)';
         if (currentTool === 'blur-image') ctx.filter = `blur(${blurRadius}px)`;
@@ -625,7 +707,11 @@ const AdvancedCompressImage = ({ toolId }) => {
           Active Tool: {currentTool.replace(/-/g, ' ')}
         </h3>
         <p className="text-xs text-indigo-700 mt-0.5">
-          {currentTool === 'format-converter'
+          {currentTool === 'make-square'
+            ? 'Crop or pad rectangular photos into a 1:1 square canvas. Choose between Center Crop, White/Black Padding, or Blurred Background.'
+            : currentTool === 'circular-crop'
+            ? 'Crop photos into a round avatar badge with transparent outer corners (Exported as PNG).'
+            : currentTool === 'format-converter'
             ? 'Convert images between JPG, PNG, WEBP, and BMP formats with instant quality settings & live file size estimation.'
             : currentTool === 'flip-image'
             ? 'Horizontal (left-right), Vertical (top-bottom), and Dual-Axis 180° inversion flipping. Supports selective layer flipping and live preview.'
@@ -633,8 +719,6 @@ const AdvancedCompressImage = ({ toolId }) => {
             ? 'Batch scale dimensions via manual px inputs, percentage shortcuts, aspect ratio locking & real-time file size estimation.'
             : currentTool === 'crop-image'
             ? 'Interactive cropper featuring Rule-of-Thirds & Golden Ratio overlays, zoom, pan controls, continuous rotation & high-resolution rendering.'
-            : currentTool === 'rotate-image'
-            ? 'Rotate images by 90, 180, or 270 degrees seamlessly.'
             : 'Client-side image processing suite.'}
         </p>
       </div>
@@ -701,6 +785,158 @@ const AdvancedCompressImage = ({ toolId }) => {
 
       {files.length > 0 && activeInfo && (
         <>
+          {/* --- MAKE IMAGE SQUARE TOOL CONTROLS & PREVIEW --- */}
+          {currentTool === 'make-square' && (
+            <div className="space-y-4">
+              <div className="p-4 bg-gray-50 rounded-xl space-y-3 border border-gray-200">
+                <label className="block text-xs font-semibold text-gray-600">Square Formatting Strategy</label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { id: 'crop', label: '1:1 Center Crop' },
+                    { id: 'pad-white', label: 'Pad (White Frame)' },
+                    { id: 'pad-black', label: 'Pad (Black Frame)' },
+                    { id: 'pad-blur', label: 'Pad (Blurred Background)' }
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setSquareMode(m.id)}
+                      className={`p-2.5 rounded-lg text-xs font-bold transition border ${
+                        squareMode === m.id
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow'
+                          : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+
+                {squareMode === 'crop' && (
+                  <div className="pt-2">
+                    <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
+                      <span>Crop Position Offset: {squareOffset}%</span>
+                      <span className="text-gray-400">
+                        {activeInfo.width > activeInfo.height ? 'Shift Horizontal' : 'Shift Vertical'}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={squareOffset}
+                      onChange={(e) => setSquareOffset(Number(e.target.value))}
+                      className="w-full accent-indigo-600"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Square Live Preview */}
+              <div className="w-full h-[320px] bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center p-4">
+                <div
+                  className="relative aspect-square max-h-full overflow-hidden rounded-xl border-2 border-dashed border-indigo-400 flex items-center justify-center"
+                  style={{
+                    backgroundColor: squareMode === 'pad-white' ? '#fff' : squareMode === 'pad-black' ? '#000' : '#1e293b'
+                  }}
+                >
+                  {squareMode === 'pad-blur' && (
+                    <img
+                      src={activeInfo.url}
+                      alt="Blur BG"
+                      className="absolute inset-0 w-full h-full object-cover filter blur-md scale-110 opacity-70"
+                    />
+                  )}
+                  <img
+                    src={activeInfo.url}
+                    alt="Square Target"
+                    style={{
+                      objectFit: squareMode === 'crop' ? 'cover' : 'contain',
+                      objectPosition: squareMode === 'crop'
+                        ? activeInfo.width > activeInfo.height ? `${squareOffset}% 50%` : `50% ${squareOffset}%`
+                        : 'center'
+                    }}
+                    className="relative z-10 max-h-full max-w-full"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* --- CIRCULAR CROP TOOL CONTROLS & PREVIEW --- */}
+          {currentTool === 'circular-crop' && (
+            <div className="space-y-4">
+              <div className="p-4 bg-gray-50 rounded-xl space-y-3 border border-gray-200">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
+                      <span>Circle Size: {circleScale}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="20"
+                      max="100"
+                      value={circleScale}
+                      onChange={(e) => setCircleScale(Number(e.target.value))}
+                      className="w-full accent-indigo-600"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
+                      <span>Center X: {circleCenterX}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={circleCenterX}
+                      onChange={(e) => setCircleCenterX(Number(e.target.value))}
+                      className="w-full accent-indigo-600"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
+                      <span>Center Y: {circleCenterY}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={circleCenterY}
+                      onChange={(e) => setCircleCenterY(Number(e.target.value))}
+                      className="w-full accent-indigo-600"
+                    />
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-amber-700 bg-amber-50 p-2 rounded border border-amber-200 font-medium">
+                  Note: Outer cut-out corners are converted to alpha transparency. Recommended export format: PNG.
+                </p>
+              </div>
+
+              {/* Circular Live Preview */}
+              <div className="w-full h-[320px] bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center p-4">
+                <div
+                  className="relative rounded-full overflow-hidden border-4 border-indigo-500 shadow-2xl flex items-center justify-center bg-slate-800"
+                  style={{
+                    width: `${Math.min(260, 260 * (circleScale / 100))}px`,
+                    height: `${Math.min(260, 260 * (circleScale / 100))}px`
+                  }}
+                >
+                  <img
+                    src={activeInfo.url}
+                    alt="Circle Preview Target"
+                    style={{
+                      objectFit: 'cover',
+                      objectPosition: `${circleCenterX}% ${circleCenterY}%`
+                    }}
+                    className="w-full h-full"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* --- FORMAT CONVERTER UNIFIED TOOL CONTROLS --- */}
           {currentTool === 'format-converter' && (
             <div className="p-5 bg-gray-50 rounded-xl space-y-4 border border-gray-200">
@@ -1087,8 +1323,8 @@ const AdvancedCompressImage = ({ toolId }) => {
                   onChange={(e) => setOutputFormat(e.target.value)}
                   className="w-full border rounded-lg p-2 text-sm bg-white font-semibold"
                 >
+                  <option value="image/png">PNG (.png) - Supports Transparency</option>
                   <option value="image/jpeg">JPEG (.jpg)</option>
-                  <option value="image/png">PNG (.png)</option>
                   <option value="image/webp">WEBP (.webp)</option>
                 </select>
               </div>
