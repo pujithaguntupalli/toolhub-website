@@ -74,8 +74,8 @@ function convertUnits(slug, amount, from, to) {
 
 // --- IMAGE TOOLS DEFINITION ---
 export const IMAGE_TOOLS = [
-  { id: 'compress-image', name: 'Compress Image', description: 'Reduce image file size while maintaining quality.', keywords: ['compress', 'jpg', 'png', 'webp', 'reduce size'] },
-  { id: 'resize-image', name: 'Resize Image', description: 'Change dimensions or scale image pixels.', keywords: ['resize', 'dimensions', 'width', 'height', 'scale'] },
+  { id: 'compress-image', name: 'Compress Image', description: 'Reduce image file size (KB/MB) while keeping pixel dimensions sharp.', keywords: ['compress', 'jpg', 'png', 'webp', 'reduce size', 'kb', 'mb'] },
+  { id: 'resize-image', name: 'Resize Image', description: 'Change image dimensions (width & height in pixels) and aspect ratio.', keywords: ['resize', 'dimensions', 'width', 'height', 'scale', 'pixels'] },
   { id: 'crop-image', name: 'Crop Image', description: 'Crop custom areas from your image.', keywords: ['crop', 'trim', 'cut'] },
   { id: 'rotate-image', name: 'Rotate Image', description: 'Rotate image by 90, 180, or 270 degrees.', keywords: ['rotate', 'turn', 'angle'] },
   { id: 'flip-image', name: 'Flip Image', description: 'Flip image horizontally or vertically.', keywords: ['flip', 'mirror'] },
@@ -259,6 +259,7 @@ const AdvancedCompressImage = ({ toolId }) => {
   
   const [width, setWidth] = useState(0);
   const [height, setHeight] = useState(0);
+  const [keepAspectRatio, setKeepAspectRatio] = useState(true);
   const [percentage, setPercentage] = useState(100);
   const [targetSizeVal, setTargetSizeVal] = useState('');
   const [targetUnit, setTargetUnit] = useState('KB');
@@ -276,7 +277,7 @@ const AdvancedCompressImage = ({ toolId }) => {
 
   const currentTool = toolId || 'compress-image';
 
-  // Live estimated file size calculation
+  // Dynamic estimated size for dimension adjustments
   const estimatedSizeBytes = useMemo(() => {
     if (!origInfo.size || origInfo.width === 0 || origInfo.height === 0) return 0;
 
@@ -323,6 +324,39 @@ const AdvancedCompressImage = ({ toolId }) => {
     img.src = url;
   };
 
+  const handleWidthChange = (val) => {
+    const w = Number(val);
+    setWidth(w);
+    if (keepAspectRatio && origInfo.width > 0 && w > 0) {
+      setHeight(Math.round(w * (origInfo.height / origInfo.width)));
+    }
+  };
+
+  const handleHeightChange = (val) => {
+    const h = Number(val);
+    setHeight(h);
+    if (keepAspectRatio && origInfo.height > 0 && h > 0) {
+      setWidth(Math.round(h * (origInfo.width / origInfo.height)));
+    }
+  };
+
+  const applyPresetRatio = (ratio) => {
+    if (!origInfo.width) return;
+    if (ratio === '1:1') {
+      const min = Math.min(origInfo.width, origInfo.height);
+      setWidth(min); setHeight(min);
+    } else if (ratio === '16:9') {
+      setWidth(origInfo.width);
+      setHeight(Math.round(origInfo.width * (9 / 16)));
+    } else if (ratio === '4:3') {
+      setWidth(origInfo.width);
+      setHeight(Math.round(origInfo.width * (3 / 4)));
+    } else {
+      setWidth(origInfo.width);
+      setHeight(origInfo.height);
+    }
+  };
+
   const processImageTool = async () => {
     if (!file || !previewUrl) return;
     setIsProcessing(true);
@@ -334,7 +368,10 @@ const AdvancedCompressImage = ({ toolId }) => {
     let outW = width || sourceWidth;
     let outH = height || sourceHeight;
 
-    if (currentTool === 'resize-percentage') {
+    if (currentTool === 'compress-image') {
+      outW = sourceWidth;
+      outH = sourceHeight;
+    } else if (currentTool === 'resize-percentage') {
       outW = Math.max(1, Math.round(sourceWidth * (percentage / 100)));
       outH = Math.max(1, Math.round(sourceHeight * (percentage / 100)));
     } else if (currentTool === 'make-square' || currentTool === 'circular-crop') {
@@ -421,7 +458,6 @@ const AdvancedCompressImage = ({ toolId }) => {
         finalFormat = 'image/jpeg';
       }
 
-      // Quality Binary Search to land as close to targetBytes as possible
       let minQ = 0.05, maxQ = 0.98;
       let bestBlob = blob;
 
@@ -437,7 +473,6 @@ const AdvancedCompressImage = ({ toolId }) => {
       }
       blob = bestBlob;
 
-      // Dimension scaling ONLY if minimum quality still exceeds targetBytes
       if (blob.size > targetBytes) {
         let currentScale = 0.95;
         while (blob.size > targetBytes && currentScale > 0.1) {
@@ -461,7 +496,7 @@ const AdvancedCompressImage = ({ toolId }) => {
       height: outH,
       size: blob.size,
       reduction: (((origInfo.size - blob.size) / origInfo.size) * 100).toFixed(1),
-      fileName: `compressed_${file.name.split('.')[0]}.${ext}`
+      fileName: `${currentTool}_${file.name.split('.')[0]}.${ext}`
     });
     setIsProcessing(false);
   };
@@ -472,6 +507,13 @@ const AdvancedCompressImage = ({ toolId }) => {
         <h3 className="font-bold text-indigo-900 text-base capitalize">
           Active Tool: {currentTool.replace(/-/g, ' ')}
         </h3>
+        <p className="text-xs text-indigo-700 mt-0.5">
+          {currentTool === 'compress-image' 
+            ? 'Reduce file size (KB/MB) while keeping full resolution intact.' 
+            : currentTool === 'resize-image'
+            ? 'Adjust width and height in pixels while locking aspect ratio.'
+            : 'Process and adjust image properties client-side.'}
+        </p>
       </div>
 
       <div>
@@ -484,7 +526,6 @@ const AdvancedCompressImage = ({ toolId }) => {
 
       {file && (
         <>
-          {/* Upload Status Card */}
           <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <CheckCircle2 className="w-5 h-5 text-emerald-600" />
@@ -500,7 +541,109 @@ const AdvancedCompressImage = ({ toolId }) => {
             </div>
           </div>
 
-          <div className="p-4 bg-gray-50 rounded-xl space-y-4">
+          <div className="p-5 bg-gray-50 rounded-xl space-y-5">
+            {/* --- COMPRESS IMAGE DEDICATED CONTROLS --- */}
+            {currentTool === 'compress-image' && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Target File Size Limit (KB / MB)</label>
+                  <div className="grid grid-cols-3 gap-3">
+                    <input
+                      type="number"
+                      placeholder={`Target Limit (e.g. ${targetUnit === 'KB' ? '50' : '2'})`}
+                      value={targetSizeVal}
+                      onChange={(e) => setTargetSizeVal(e.target.value)}
+                      className="col-span-2 border rounded-lg p-2.5 text-sm bg-white"
+                    />
+                    <select
+                      value={targetUnit}
+                      onChange={(e) => setTargetUnit(e.target.value)}
+                      className="border rounded-lg p-2.5 text-sm bg-white font-semibold"
+                    >
+                      <option value="KB">KB (Kilobytes)</option>
+                      <option value="MB">MB (Megabytes)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs font-semibold text-gray-700 mb-1">
+                    <span>Compression Quality ({quality}%)</span>
+                    <span className="text-indigo-600">Resolution stays at {origInfo.width}x{origInfo.height}px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="10"
+                    max="100"
+                    value={quality}
+                    onChange={(e) => setQuality(Number(e.target.value))}
+                    className="w-full accent-indigo-600"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* --- RESIZE IMAGE DEDICATED CONTROLS --- */}
+            {['resize-image', 'change-dimensions', 'resize-pixels'].includes(currentTool) && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-semibold text-gray-700">Dimensions (Pixels)</span>
+                    <button
+                      type="button"
+                      onClick={() => setKeepAspectRatio(!keepAspectRatio)}
+                      className={`px-2 py-0.5 rounded text-xs flex items-center space-x-1 ${
+                        keepAspectRatio ? 'bg-indigo-100 text-indigo-700 font-bold' : 'bg-gray-200 text-gray-600'
+                      }`}
+                    >
+                      {keepAspectRatio ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                      <span>{keepAspectRatio ? 'Aspect Ratio Locked' : 'Unlocked'}</span>
+                    </button>
+                  </div>
+                  <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                    Est. Output Size: ~{formatBytes(estimatedSizeBytes)}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Width (px)</label>
+                    <input
+                      type="number"
+                      value={width}
+                      onChange={(e) => handleWidthChange(e.target.value)}
+                      className="w-full border rounded-lg p-2 text-sm bg-white font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Height (px)</label>
+                    <input
+                      type="number"
+                      value={height}
+                      onChange={(e) => handleHeightChange(e.target.value)}
+                      className="w-full border rounded-lg p-2 text-sm bg-white font-semibold"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Aspect Ratio Presets</label>
+                  <div className="flex space-x-2">
+                    {['Original', '16:9', '4:3', '1:1'].map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => applyPresetRatio(r)}
+                        className="px-3 py-1 bg-white border border-gray-200 rounded-lg text-xs font-medium hover:border-indigo-500 hover:text-indigo-600 transition"
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {currentTool === 'resize-percentage' && (
               <div>
                 <div className="flex justify-between items-center mb-1">
@@ -572,65 +715,17 @@ const AdvancedCompressImage = ({ toolId }) => {
               </div>
             )}
 
-            {['compress-image', 'resize-image', 'change-dimensions', 'resize-pixels'].includes(currentTool) && (
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-semibold text-gray-600">Dimensions (Pixels)</span>
-                  <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
-                    Est. Output Size: ~{formatBytes(estimatedSizeBytes)}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">Width (px)</label>
-                    <input
-                      type="number"
-                      value={width}
-                      onChange={(e) => setWidth(Number(e.target.value))}
-                      className="w-full border rounded-lg p-2 text-sm bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">Height (px)</label>
-                    <input
-                      type="number"
-                      value={height}
-                      onChange={(e) => setHeight(Number(e.target.value))}
-                      className="w-full border rounded-lg p-2 text-sm bg-white"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Output Format & Target Size Limit</label>
-              <div className="grid grid-cols-3 gap-3">
-                <select
-                  value={outputFormat}
-                  onChange={(e) => setOutputFormat(e.target.value)}
-                  className="border rounded-lg p-2 text-sm bg-white"
-                >
-                  <option value="image/jpeg">JPEG (.jpg)</option>
-                  <option value="image/png">PNG (.png)</option>
-                  <option value="image/webp">WEBP (.webp)</option>
-                </select>
-                <input
-                  type="number"
-                  placeholder={`Target Limit (e.g. ${targetUnit === 'KB' ? '50' : '2'})`}
-                  value={targetSizeVal}
-                  onChange={(e) => setTargetSizeVal(e.target.value)}
-                  className="border rounded-lg p-2 text-sm bg-white"
-                />
-                <select
-                  value={targetUnit}
-                  onChange={(e) => setTargetUnit(e.target.value)}
-                  className="border rounded-lg p-2 text-sm bg-white font-semibold"
-                >
-                  <option value="KB">KB (Kilobytes)</option>
-                  <option value="MB">MB (Megabytes)</option>
-                </select>
-              </div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Output Format</label>
+              <select
+                value={outputFormat}
+                onChange={(e) => setOutputFormat(e.target.value)}
+                className="w-full border rounded-lg p-2 text-sm bg-white"
+              >
+                <option value="image/jpeg">JPEG (.jpg)</option>
+                <option value="image/png">PNG (.png)</option>
+                <option value="image/webp">WEBP (.webp)</option>
+              </select>
             </div>
           </div>
 
@@ -654,7 +749,7 @@ const AdvancedCompressImage = ({ toolId }) => {
                 className="flex items-center justify-center space-x-2 w-full py-2.5 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition text-sm"
               >
                 <Download className="w-4 h-4" />
-                <span>Download Compressed Result</span>
+                <span>Download Result</span>
               </a>
             </div>
           )}
