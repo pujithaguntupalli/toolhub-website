@@ -267,10 +267,12 @@ const AdvancedCompressImage = ({ toolId }) => {
   const [quality, setQuality] = useState(85);
   const [outputFormat, setOutputFormat] = useState('image/jpeg');
 
-  // --- CROPPER STATES ---
+  // --- CROPPER & ROTATION STATES ---
   const [cropRatioPreset, setCropRatioPreset] = useState('Freeform');
   const [gridOverlay, setGridOverlay] = useState('thirds'); // 'none', 'thirds', 'golden'
   const [rotationAngle, setRotationAngle] = useState(0); // -180 to 180 continuous degrees
+  const [rotation, setRotation] = useState(90); // Preset rotation (90, 180, 270)
+  const [flipMode, setFlipMode] = useState('horizontal');
   const [flipHoriz, setFlipHoriz] = useState(false);
   const [flipVert, setFlipVert] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -454,7 +456,7 @@ const AdvancedCompressImage = ({ toolId }) => {
     isDragging.current = false;
   };
 
-  // High-Resolution Batch Processing Engine
+  // High-Resolution Processing Engine (With Rotation Fixes)
   const executeImageEngine = async () => {
     if (files.length === 0) return;
     setIsProcessing(true);
@@ -466,8 +468,23 @@ const AdvancedCompressImage = ({ toolId }) => {
       const sourceW = bitmap.width;
       const sourceH = bitmap.height;
 
+      // Determine target canvas dimensions
       let renderW = width || sourceW;
       let renderH = height || sourceH;
+
+      // Determine total rotation angle depending on active tool
+      const currentAngle = currentTool === 'rotate-image' 
+        ? rotation 
+        : currentTool === 'crop-image' 
+        ? rotationAngle 
+        : 0;
+
+      // Swap canvas dimensions if rotated 90 or 270 degrees
+      const normalizedAngle = ((currentAngle % 360) + 360) % 360;
+      if (normalizedAngle === 90 || normalizedAngle === 270) {
+        renderW = height || sourceH;
+        renderH = width || sourceW;
+      }
 
       if (currentTool === 'crop-image') {
         renderW = Math.round((sourceW * cropBox.w) / 100);
@@ -493,19 +510,7 @@ const AdvancedCompressImage = ({ toolId }) => {
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
 
-      if (currentTool === 'crop-image') {
-        const cropX = Math.round((sourceW * cropBox.x) / 100);
-        const cropY = Math.round((sourceH * cropBox.y) / 100);
-        const cropW = Math.round((sourceW * cropBox.w) / 100);
-        const cropH = Math.round((sourceH * cropBox.h) / 100);
-
-        ctx.save();
-        ctx.translate(renderW / 2, renderH / 2);
-        ctx.rotate((rotationAngle * Math.PI) / 180);
-        ctx.scale(flipHoriz ? -1 : 1, flipVert ? -1 : 1);
-        ctx.drawImage(bitmap, cropX, cropY, cropW, cropH, -renderW / 2, -renderH / 2, renderW, renderH);
-        ctx.restore();
-      } else if (currentTool === 'circular-crop') {
+      if (currentTool === 'circular-crop') {
         ctx.beginPath();
         ctx.arc(renderW / 2, renderH / 2, renderW / 2, 0, Math.PI * 2);
         ctx.clip();
@@ -516,7 +521,30 @@ const AdvancedCompressImage = ({ toolId }) => {
         if (currentTool === 'grayscale-image') ctx.filter = 'grayscale(1)';
         if (currentTool === 'blur-image') ctx.filter = `blur(${blurRadius}px)`;
 
-        ctx.drawImage(bitmap, 0, 0, sourceW, sourceH, 0, 0, renderW, renderH);
+        ctx.save();
+        // Translate origin to center of canvas for proper rotation pivot
+        ctx.translate(renderW / 2, renderH / 2);
+        ctx.rotate((currentAngle * Math.PI) / 180);
+
+        if (currentTool === 'flip-image') {
+          ctx.scale(flipMode === 'horizontal' ? -1 : 1, flipMode === 'vertical' ? -1 : 1);
+        } else if (currentTool === 'crop-image') {
+          ctx.scale(flipHoriz ? -1 : 1, flipVert ? -1 : 1);
+        }
+
+        if (currentTool === 'crop-image') {
+          const cropX = Math.round((sourceW * cropBox.x) / 100);
+          const cropY = Math.round((sourceH * cropBox.y) / 100);
+          const cropW = Math.round((sourceW * cropBox.w) / 100);
+          const cropH = Math.round((sourceH * cropBox.h) / 100);
+          ctx.drawImage(bitmap, cropX, cropY, cropW, cropH, -renderW / 2, -renderH / 2, renderW, renderH);
+        } else {
+          // Draw centered around origin
+          const drawW = (normalizedAngle === 90 || normalizedAngle === 270) ? renderH : renderW;
+          const drawH = (normalizedAngle === 90 || normalizedAngle === 270) ? renderW : renderH;
+          ctx.drawImage(bitmap, -drawW / 2, -drawH / 2, drawW, drawH);
+        }
+        ctx.restore();
         ctx.filter = 'none';
       }
 
@@ -560,6 +588,8 @@ const AdvancedCompressImage = ({ toolId }) => {
             ? 'Batch scale dimensions via manual px inputs, percentage shortcuts, aspect ratio locking & real-time file size estimation.'
             : currentTool === 'crop-image'
             ? 'Interactive cropper featuring Rule-of-Thirds & Golden Ratio overlays, zoom, pan controls, continuous rotation & high-resolution rendering.'
+            : currentTool === 'rotate-image'
+            ? 'Rotate images by 90, 180, or 270 degrees seamlessly.'
             : 'Client-side image processing suite.'}
         </p>
       </div>
@@ -712,6 +742,22 @@ const AdvancedCompressImage = ({ toolId }) => {
                   ))}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* --- ROTATE IMAGE DEDICATED CONTROL --- */}
+          {currentTool === 'rotate-image' && (
+            <div className="p-5 bg-gray-50 rounded-xl space-y-4">
+              <label className="block text-xs font-semibold text-gray-600">Rotation Angle</label>
+              <select
+                value={rotation}
+                onChange={(e) => setRotation(Number(e.target.value))}
+                className="w-full border rounded-lg p-2.5 text-sm bg-white font-semibold"
+              >
+                <option value={90}>90° Clockwise</option>
+                <option value={180}>180° Turn</option>
+                <option value={270}>270° Counter-Clockwise</option>
+              </select>
             </div>
           )}
 
