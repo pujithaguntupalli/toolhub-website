@@ -72,19 +72,14 @@ function convertUnits(slug, amount, from, to) {
   return fmt(num * uFrom[1] / uTo[1]);
 }
 
-// --- IMAGE TOOLS DEFINITION ---
+// --- CONSOLIDATED IMAGE TOOLS DEFINITION ---
 export const IMAGE_TOOLS = [
+  { id: 'format-converter', name: 'Image Format Converter', description: 'Universal format converter supporting JPG, JPEG, PNG, WEBP, and BMP with high quality batch exports.', keywords: ['format', 'convert', 'image', 'jpg', 'jpeg', 'png', 'webp', 'bmp'] },
   { id: 'compress-image', name: 'Compress Image', description: 'Reduce image file size (KB/MB) while keeping pixel dimensions sharp.', keywords: ['compress', 'jpg', 'png', 'webp', 'reduce size', 'kb', 'mb'] },
   { id: 'resize-image', name: 'Resize Image', description: 'Batch scale resolution with px/% controls, aspect ratio lock & live file size estimator.', keywords: ['resize', 'dimensions', 'width', 'height', 'scale', 'pixels', 'batch'] },
   { id: 'crop-image', name: 'Crop Image', description: 'Interactive cropper with composition grids, zoom, continuous rotation & high-res rendering.', keywords: ['crop', 'trim', 'cut', 'aspect ratio', 'interactive', 'rotate'] },
   { id: 'rotate-image', name: 'Rotate Image', description: 'Rotate image by 90, 180, or 270 degrees.', keywords: ['rotate', 'turn', 'angle'] },
   { id: 'flip-image', name: 'Flip Image', description: 'Horizontal, vertical & dual-axis 180° inversion with selective region flipping & non-destructive preview.', keywords: ['flip', 'mirror', 'horizontal', 'vertical', 'dual axis', 'selective', 'invert'] },
-  { id: 'jpg-to-png', name: 'JPG to PNG', description: 'Convert JPG images to PNG format.', keywords: ['jpg', 'png', 'convert'] },
-  { id: 'png-to-jpg', name: 'PNG to JPG', description: 'Convert PNG images to JPG format.', keywords: ['png', 'jpg', 'convert'] },
-  { id: 'webp-to-jpg', name: 'WEBP to JPG', description: 'Convert WEBP images to JPG format.', keywords: ['webp', 'jpg', 'convert'] },
-  { id: 'jpg-to-webp', name: 'JPG to WEBP', description: 'Convert JPG images to WebP format.', keywords: ['jpg', 'webp', 'convert'] },
-  { id: 'png-to-webp', name: 'PNG to WEBP', description: 'Convert PNG images to WebP format.', keywords: ['png', 'webp', 'convert'] },
-  { id: 'format-converter', name: 'Image Format Converter', description: 'Universal format converter (JPG, PNG, WEBP).', keywords: ['format', 'convert', 'image'] },
   { id: 'change-dimensions', name: 'Change Dimensions', description: 'Set specific width and height in pixels.', keywords: ['dimensions', 'px', 'resize'] },
   { id: 'resize-percentage', name: 'Resize by Percentage', description: 'Scale image size by percentage.', keywords: ['percentage', 'scale'] },
   { id: 'resize-pixels', name: 'Resize by Pixels', description: 'Scale image resolution directly.', keywords: ['pixels', 'resolution'] },
@@ -258,6 +253,9 @@ const AdvancedCompressImage = ({ toolId }) => {
   const [activeFileIdx, setActiveFileIdx] = useState(0);
   const [origInfos, setOrigInfos] = useState([]);
 
+  // --- FORMAT CONVERTER STATES ---
+  const [targetFormat, setTargetFormat] = useState('image/png');
+
   // --- RESIZER STATES ---
   const [resizeMode, setResizeMode] = useState('px'); // 'px' or '%'
   const [width, setWidth] = useState(0);
@@ -299,8 +297,8 @@ const AdvancedCompressImage = ({ toolId }) => {
   const startBox = useRef({ x: 0, y: 0, w: 0, h: 0 });
   const startPan = useRef({ x: 0, y: 0 });
 
-  const currentTool = toolId || 'compress-image';
-  const activeInfo = origInfos[activeFileIdx] || { width: 0, height: 0, size: 0, url: '' };
+  const currentTool = toolId || 'format-converter';
+  const activeInfo = origInfos[activeFileIdx] || { width: 0, height: 0, size: 0, url: '', format: 'image/jpeg' };
 
   // Live File Size Estimator
   const estimatedSizeBytes = useMemo(() => {
@@ -317,9 +315,11 @@ const AdvancedCompressImage = ({ toolId }) => {
     }
 
     const areaRatio = (targetW * targetH) / (activeInfo.width * activeInfo.height);
-    const estimated = activeInfo.size * areaRatio * (quality / 100);
+    const selectedFormat = currentTool === 'format-converter' ? targetFormat : outputFormat;
+    const formatMultiplier = selectedFormat === 'image/png' ? 1.2 : selectedFormat === 'image/webp' ? 0.7 : 0.85;
+    const estimated = activeInfo.size * areaRatio * (quality / 100) * formatMultiplier;
     return Math.max(1024, Math.round(estimated));
-  }, [activeInfo, width, height, pctVal, cropBox, quality, currentTool, resizeMode]);
+  }, [activeInfo, width, height, pctVal, cropBox, quality, currentTool, resizeMode, targetFormat, outputFormat]);
 
   const handleFilesChange = (e) => {
     const selected = Array.from(e.target.files).filter((f) => f.type.startsWith('image/'));
@@ -338,7 +338,7 @@ const AdvancedCompressImage = ({ toolId }) => {
           width: img.naturalWidth,
           height: img.naturalHeight,
           size: file.size,
-          type: file.type,
+          type: file.type || 'image/jpeg',
           url
         };
         if (index === 0) {
@@ -460,11 +460,13 @@ const AdvancedCompressImage = ({ toolId }) => {
     isDragging.current = false;
   };
 
-  // High-Resolution Processing Engine (With Double-Layer Artifact Fix)
+  // High-Resolution Processing Engine
   const executeImageEngine = async () => {
     if (files.length === 0) return;
     setIsProcessing(true);
     const results = [];
+
+    const effectiveFormat = currentTool === 'format-converter' ? targetFormat : outputFormat;
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -506,7 +508,7 @@ const AdvancedCompressImage = ({ toolId }) => {
       canvas.height = renderH;
       const ctx = canvas.getContext('2d');
 
-      if (outputFormat === 'image/jpeg') {
+      if (effectiveFormat === 'image/jpeg') {
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, renderW, renderH);
       }
@@ -526,7 +528,7 @@ const AdvancedCompressImage = ({ toolId }) => {
 
         // 3. Erase underlying selection rectangle to prevent double-image overlap artifacts
         ctx.clearRect(srcX, srcY, srcW, srcH);
-        if (outputFormat === 'image/jpeg') {
+        if (effectiveFormat === 'image/jpeg') {
           ctx.fillStyle = '#FFFFFF';
           ctx.fillRect(srcX, srcY, srcW, srcH);
         }
@@ -591,10 +593,17 @@ const AdvancedCompressImage = ({ toolId }) => {
         ctx.fillText(watermarkText, renderW / 2, renderH - fontSize * 0.7);
       }
 
-      const blob = await new Promise((res) => canvas.toBlob(res, outputFormat, quality / 100));
+      const blob = await new Promise((res) => canvas.toBlob(res, effectiveFormat, quality / 100));
       bitmap.close();
 
-      const ext = outputFormat === 'image/jpeg' ? 'jpg' : outputFormat.split('/')[1];
+      const extMap = {
+        'image/jpeg': 'jpg',
+        'image/png': 'png',
+        'image/webp': 'webp',
+        'image/bmp': 'bmp'
+      };
+      const ext = extMap[effectiveFormat] || 'jpg';
+
       results.push({
         url: URL.createObjectURL(blob),
         fileName: `${currentTool}_${file.name.split('.')[0]}.${ext}`,
@@ -615,7 +624,9 @@ const AdvancedCompressImage = ({ toolId }) => {
           Active Tool: {currentTool.replace(/-/g, ' ')}
         </h3>
         <p className="text-xs text-indigo-700 mt-0.5">
-          {currentTool === 'flip-image'
+          {currentTool === 'format-converter'
+            ? 'Convert images between JPG, PNG, WEBP, and BMP formats with instant quality settings & live file size estimation.'
+            : currentTool === 'flip-image'
             ? 'Horizontal (left-right), Vertical (top-bottom), and Dual-Axis 180° inversion flipping. Supports selective layer flipping and live preview.'
             : currentTool === 'resize-image' || ['change-dimensions', 'resize-pixels', 'resize-percentage'].includes(currentTool)
             ? 'Batch scale dimensions via manual px inputs, percentage shortcuts, aspect ratio locking & real-time file size estimation.'
@@ -653,6 +664,34 @@ const AdvancedCompressImage = ({ toolId }) => {
                   {f.name}
                 </button>
               ))}
+            </div>
+          )}
+
+          {/* --- FORMAT CONVERTER UNIFIED TOOL CONTROLS --- */}
+          {currentTool === 'format-converter' && (
+            <div className="p-5 bg-gray-50 rounded-xl space-y-4 border border-gray-200">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Source Format (Detected)</label>
+                  <div className="p-2.5 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-700 uppercase">
+                    {activeInfo.type ? activeInfo.type.replace('image/', '') : 'JPG / PNG'}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Target Export Format</label>
+                  <select
+                    value={targetFormat}
+                    onChange={(e) => setTargetFormat(e.target.value)}
+                    className="w-full border border-indigo-300 rounded-lg p-2.5 text-sm bg-white font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500 outline-none"
+                  >
+                    <option value="image/png">PNG (.png)</option>
+                    <option value="image/jpeg">JPG / JPEG (.jpg)</option>
+                    <option value="image/webp">WEBP (.webp)</option>
+                    <option value="image/bmp">BMP (.bmp)</option>
+                  </select>
+                </div>
+              </div>
             </div>
           )}
 
@@ -993,34 +1032,36 @@ const AdvancedCompressImage = ({ toolId }) => {
           )}
 
           {/* Export Settings & Format Conversion */}
-          <div className="grid grid-cols-2 gap-3 bg-gray-50 p-4 rounded-xl">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Export Format</label>
-              <select
-                value={outputFormat}
-                onChange={(e) => setOutputFormat(e.target.value)}
-                className="w-full border rounded-lg p-2 text-sm bg-white font-semibold"
-              >
-                <option value="image/jpeg">JPEG (.jpg)</option>
-                <option value="image/png">PNG (.png)</option>
-                <option value="image/webp">WEBP (.webp)</option>
-              </select>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
-                <span>Compression Quality ({quality}%)</span>
+          {currentTool !== 'format-converter' && (
+            <div className="grid grid-cols-2 gap-3 bg-gray-50 p-4 rounded-xl">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Export Format</label>
+                <select
+                  value={outputFormat}
+                  onChange={(e) => setOutputFormat(e.target.value)}
+                  className="w-full border rounded-lg p-2 text-sm bg-white font-semibold"
+                >
+                  <option value="image/jpeg">JPEG (.jpg)</option>
+                  <option value="image/png">PNG (.png)</option>
+                  <option value="image/webp">WEBP (.webp)</option>
+                </select>
               </div>
-              <input
-                type="range"
-                min="1"
-                max="100"
-                value={quality}
-                onChange={(e) => setQuality(Number(e.target.value))}
-                className="w-full accent-indigo-600"
-              />
+
+              <div>
+                <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
+                  <span>Compression Quality ({quality}%)</span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max="100"
+                  value={quality}
+                  onChange={(e) => setQuality(Number(e.target.value))}
+                  className="w-full accent-indigo-600"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="p-3 bg-indigo-50/60 border border-indigo-100 rounded-xl flex items-center justify-between text-xs font-semibold text-indigo-900">
             <span>Estimated Output File Size:</span>
@@ -2222,7 +2263,7 @@ export default function App() {
             <div>
               <span className="font-bold text-xl text-slate-900 tracking-tight">ToolHub</span>
               <span className="text-xs bg-indigo-100 text-indigo-700 font-semibold px-2 py-0.5 rounded-full ml-2">
-                80-in-1
+                Unified Tools
               </span>
             </div>
           </div>
@@ -2246,14 +2287,14 @@ export default function App() {
                   Every Online Tool You Need, <span className="text-indigo-600">Free & Private</span>
                 </h1>
                 <p className="text-slate-600 text-base sm:text-lg">
-                  80 Browser-based image tools, PDF processors, unit converters, and calculators. 100% Client-side processing.
+                  Unified image format converter, PDF processors, unit converters, and calculators. 100% Client-side processing.
                 </p>
 
                 <div className="relative max-w-xl mx-auto pt-2">
                   <Search className="absolute left-4 top-6 text-slate-400 w-5 h-5" />
                   <input
                     type="text"
-                    placeholder="Search 80+ tools (e.g., compress image, convert pdf, bmi, unit converter)..."
+                    placeholder="Search tools (e.g., format converter, compress image, convert pdf, bmi)..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-12 pr-4 py-4 rounded-2xl border border-slate-200 bg-white shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none text-base"
@@ -2296,11 +2337,11 @@ export default function App() {
               <div className="space-y-8">
                 <div className="flex items-center justify-center space-x-2 border-b border-slate-200 pb-4 overflow-x-auto">
                   {[
-                    { id: 'all', label: 'All Tools (80)' },
-                    { id: 'image', label: 'Image Tools (20)' },
-                    { id: 'pdf', label: 'PDF Tools (18)' },
-                    { id: 'converters', label: 'Unit Converters (20)' },
-                    { id: 'calculators', label: 'Calculators (20)' }
+                    { id: 'all', label: 'All Tools' },
+                    { id: 'image', label: 'Image Tools' },
+                    { id: 'pdf', label: 'PDF Tools' },
+                    { id: 'converters', label: 'Unit Converters' },
+                    { id: 'calculators', label: 'Calculators' }
                   ].map((cat) => (
                     <button
                       key={cat.id}
@@ -2359,7 +2400,7 @@ export default function App() {
           <div className="bg-white p-8 rounded-2xl border max-w-3xl mx-auto space-y-4">
             <h2 className="text-2xl font-bold">About ToolHub</h2>
             <p className="text-slate-600 leading-relaxed">
-              ToolHub is a modern, privacy-first online multi-tool suite designed to perform image compression, document editing, unit conversions, and calculations directly inside your browser. No files are ever stored on external servers.
+              ToolHub is a modern, privacy-first online multi-tool suite designed to perform image conversion, document editing, unit conversions, and calculations directly inside your browser. No files are ever stored on external servers.
             </p>
           </div>
         )}
