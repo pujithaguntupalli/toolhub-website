@@ -3,7 +3,7 @@ import {
   Search, Calculator, ArrowRightLeft, FileText, Image as ImageIcon, 
   Download, Upload, Trash2, RotateCw, Sparkles, AlertCircle, ChevronRight,
   Layers, Lock, Unlock, ArrowLeft, Star, Clock, Percent, Volume2, Cpu,
-  Database, Flame, HardDrive, Compass, Thermometer, Box, Scale, Shield, Maximize2, Crop
+  Database, Flame, HardDrive, Compass, Thermometer, Box, Scale, Shield, Maximize2, Crop, CheckCircle2
 } from 'lucide-react';
 
 // --- CONVERTER DATA & FORMULAS ---
@@ -330,86 +330,109 @@ const AdvancedCompressImage = ({ toolId }) => {
       outH = sourceWidth;
     }
 
-    const canvas = document.createElement('canvas');
-    canvas.width = outW;
-    canvas.height = outH;
-    const ctx = canvas.getContext('2d', { alpha: outputFormat !== 'image/jpeg' });
+    const generateBlob = async (w, h, fmt, q) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d', { alpha: fmt !== 'image/jpeg' });
 
-    if (outputFormat === 'image/jpeg') {
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, outW, outH);
-    }
-
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-
-    if (currentTool === 'rotate-image') {
-      ctx.save();
-      ctx.translate(outW / 2, outH / 2);
-      ctx.rotate((rotation * Math.PI) / 180);
-      ctx.drawImage(bitmap, -sourceWidth / 2, -sourceHeight / 2);
-      ctx.restore();
-    } else if (currentTool === 'flip-image') {
-      ctx.save();
-      ctx.translate(flipMode === 'horizontal' ? outW : 0, flipMode === 'vertical' ? outH : 0);
-      ctx.scale(flipMode === 'horizontal' ? -1 : 1, flipMode === 'vertical' ? -1 : 1);
-      ctx.drawImage(bitmap, 0, 0, outW, outH);
-      ctx.restore();
-    } else if (currentTool === 'circular-crop') {
-      ctx.beginPath();
-      ctx.arc(outW / 2, outH / 2, outW / 2, 0, Math.PI * 2);
-      ctx.clip();
-      const sx = Math.floor((sourceWidth - outW) / 2);
-      const sy = Math.floor((sourceHeight - outH) / 2);
-      ctx.drawImage(bitmap, sx, sy, outW, outH, 0, 0, outW, outH);
-    } else {
-      if (currentTool === 'grayscale-image') ctx.filter = 'grayscale(1)';
-      if (currentTool === 'blur-image') ctx.filter = `blur(${blurRadius}px)`;
-
-      let sx = 0, sy = 0, sw = sourceWidth, sh = sourceHeight;
-      if (currentTool === 'make-square') {
-        sw = outW; sh = outH;
-        sx = Math.floor((sourceWidth - sw) / 2);
-        sy = Math.floor((sourceHeight - sh) / 2);
+      if (fmt === 'image/jpeg') {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, w, h);
       }
 
-      ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, outW, outH);
-      ctx.filter = 'none';
-    }
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
 
-    if (currentTool === 'add-text-image' && watermarkText) {
-      const fontSize = Math.max(16, Math.round(outW / 18));
-      ctx.font = `600 ${fontSize}px system-ui, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
-      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-      ctx.lineWidth = 3;
-      ctx.fillStyle = '#ffffff';
-      ctx.strokeText(watermarkText, outW / 2, outH - fontSize * 0.7);
-      ctx.fillText(watermarkText, outW / 2, outH - fontSize * 0.7);
-    }
+      if (currentTool === 'rotate-image') {
+        ctx.save();
+        ctx.translate(w / 2, h / 2);
+        ctx.rotate((rotation * Math.PI) / 180);
+        ctx.drawImage(bitmap, -sourceWidth / 2, -sourceHeight / 2);
+        ctx.restore();
+      } else if (currentTool === 'flip-image') {
+        ctx.save();
+        ctx.translate(flipMode === 'horizontal' ? w : 0, flipMode === 'vertical' ? h : 0);
+        ctx.scale(flipMode === 'horizontal' ? -1 : 1, flipMode === 'vertical' ? -1 : 1);
+        ctx.drawImage(bitmap, 0, 0, w, h);
+        ctx.restore();
+      } else if (currentTool === 'circular-crop') {
+        ctx.beginPath();
+        ctx.arc(w / 2, h / 2, w / 2, 0, Math.PI * 2);
+        ctx.clip();
+        const sx = Math.floor((sourceWidth - w) / 2);
+        const sy = Math.floor((sourceHeight - h) / 2);
+        ctx.drawImage(bitmap, sx, sy, w, h, 0, 0, w, h);
+      } else {
+        if (currentTool === 'grayscale-image') ctx.filter = 'grayscale(1)';
+        if (currentTool === 'blur-image') ctx.filter = `blur(${blurRadius}px)`;
+
+        let sx = 0, sy = 0, sw = sourceWidth, sh = sourceHeight;
+        if (currentTool === 'make-square') {
+          sw = w; sh = h;
+          sx = Math.floor((sourceWidth - sw) / 2);
+          sy = Math.floor((sourceHeight - sh) / 2);
+        }
+
+        ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, w, h);
+        ctx.filter = 'none';
+      }
+
+      if (currentTool === 'add-text-image' && watermarkText) {
+        const fontSize = Math.max(16, Math.round(w / 18));
+        ctx.font = `600 ${fontSize}px system-ui, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+        ctx.lineWidth = 3;
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeText(watermarkText, w / 2, h - fontSize * 0.7);
+        ctx.fillText(watermarkText, w / 2, h - fontSize * 0.7);
+      }
+
+      return new Promise((res) => canvas.toBlob(res, fmt, q));
+    };
 
     let q = quality / 100;
-    let blob = await new Promise((res) => canvas.toBlob(res, outputFormat, q));
+    let finalFormat = outputFormat;
+    let blob = await generateBlob(outW, outH, finalFormat, q);
 
-    if (currentTool === 'compress-image' && targetSizeKb > 0 && outputFormat !== 'image/png') {
-      const targetBytes = targetSizeKb * 1024;
+    // Target KB Size Reduction Logic
+    if (targetSizeKb && Number(targetSizeKb) > 0) {
+      const targetBytes = Number(targetSizeKb) * 1024;
+      if (finalFormat === 'image/png') {
+        finalFormat = 'image/jpeg'; // Convert to JPEG to compress down to size target
+      }
+
+      let currentScale = 1.0;
       let minQ = 0.05, maxQ = q;
-      for (let i = 0; i < 6; i++) {
+
+      // Quality Binary Search
+      for (let i = 0; i < 8; i++) {
         const midQ = (minQ + maxQ) / 2;
-        const candidate = await new Promise((res) => canvas.toBlob(res, outputFormat, midQ));
-        if (candidate.size <= targetBytes) {
-          blob = candidate;
+        const testBlob = await generateBlob(outW, outH, finalFormat, midQ);
+        if (testBlob.size <= targetBytes) {
+          blob = testBlob;
           minQ = midQ;
         } else {
           maxQ = midQ;
         }
       }
+
+      // If quality reduction alone isn't enough, scale down resolution
+      while (blob.size > targetBytes && currentScale > 0.1) {
+        currentScale -= 0.1;
+        const scaledW = Math.max(16, Math.round(outW * currentScale));
+        const scaledH = Math.max(16, Math.round(outH * currentScale));
+        blob = await generateBlob(scaledW, scaledH, finalFormat, 0.5);
+        outW = scaledW;
+        outH = scaledH;
+      }
     }
 
     bitmap.close();
     const url = URL.createObjectURL(blob);
-    const ext = outputFormat === 'image/jpeg' ? 'jpg' : outputFormat.split('/')[1];
+    const ext = finalFormat === 'image/jpeg' ? 'jpg' : finalFormat.split('/')[1];
 
     setResult({
       url,
@@ -440,6 +463,22 @@ const AdvancedCompressImage = ({ toolId }) => {
 
       {file && (
         <>
+          {/* Upload Status Card */}
+          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              <div>
+                <p className="text-sm font-bold text-emerald-900">Image Uploaded Successfully</p>
+                <p className="text-xs text-emerald-700">{file.name} ({origInfo.width}x{origInfo.height}px)</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-xs font-semibold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-lg">
+                Original Size: {formatBytes(origInfo.size)} ({origInfo.size.toLocaleString()} Bytes)
+              </span>
+            </div>
+          </div>
+
           <div className="p-4 bg-gray-50 rounded-xl space-y-4">
             {currentTool === 'resize-percentage' && (
               <div>
@@ -448,7 +487,7 @@ const AdvancedCompressImage = ({ toolId }) => {
                   type="number"
                   value={percentage}
                   onChange={(e) => setPercentage(Number(e.target.value))}
-                  className="w-full border rounded-lg p-2 text-sm"
+                  className="w-full border rounded-lg p-2 text-sm bg-white"
                 />
               </div>
             )}
@@ -504,7 +543,7 @@ const AdvancedCompressImage = ({ toolId }) => {
                   placeholder="Enter text overlay..."
                   value={watermarkText}
                   onChange={(e) => setWatermarkText(e.target.value)}
-                  className="w-full border rounded-lg p-2 text-sm"
+                  className="w-full border rounded-lg p-2 text-sm bg-white"
                 />
               </div>
             )}
@@ -517,7 +556,7 @@ const AdvancedCompressImage = ({ toolId }) => {
                     type="number"
                     value={width}
                     onChange={(e) => setWidth(Number(e.target.value))}
-                    className="w-full border rounded-lg p-2 text-sm"
+                    className="w-full border rounded-lg p-2 text-sm bg-white"
                   />
                 </div>
                 <div>
@@ -526,14 +565,14 @@ const AdvancedCompressImage = ({ toolId }) => {
                     type="number"
                     value={height}
                     onChange={(e) => setHeight(Number(e.target.value))}
-                    className="w-full border rounded-lg p-2 text-sm"
+                    className="w-full border rounded-lg p-2 text-sm bg-white"
                   />
                 </div>
               </div>
             )}
 
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Output Format & Target Size</label>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Output Format & Target Size Limit</label>
               <div className="grid grid-cols-2 gap-3">
                 <select
                   value={outputFormat}
@@ -546,10 +585,10 @@ const AdvancedCompressImage = ({ toolId }) => {
                 </select>
                 <input
                   type="number"
-                  placeholder="Target KB (e.g. 200)"
+                  placeholder="Target KB limit (e.g. 100)"
                   value={targetSizeKb}
                   onChange={(e) => setTargetSizeKb(e.target.value)}
-                  className="border rounded-lg p-2 text-sm"
+                  className="border rounded-lg p-2 text-sm bg-white"
                 />
               </div>
             </div>
@@ -567,7 +606,7 @@ const AdvancedCompressImage = ({ toolId }) => {
             <div className="p-4 border border-indigo-100 rounded-xl bg-indigo-50/50 space-y-3">
               <div className="flex items-center justify-between text-xs text-gray-700">
                 <span>Dimensions: <strong>{result.width}x{result.height}px</strong></span>
-                <span>Output Size: <strong>{formatBytes(result.size)}</strong></span>
+                <span>Output Size: <strong>{formatBytes(result.size)}</strong> ({result.size.toLocaleString()} Bytes)</span>
               </div>
               <a
                 href={result.url}
@@ -575,7 +614,7 @@ const AdvancedCompressImage = ({ toolId }) => {
                 className="flex items-center justify-center space-x-2 w-full py-2.5 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition text-sm"
               >
                 <Download className="w-4 h-4" />
-                <span>Download Result</span>
+                <span>Download Compressed Result</span>
               </a>
             </div>
           )}
@@ -745,7 +784,6 @@ const PdfToolEngine = ({ toolId }) => {
           const pdfDoc = await loadingTask.promise;
           const totalPages = pdfDoc.numPages;
 
-          // Parse specified page range or default to all pages
           const targetPages = parsePageRange(pages, totalPages);
 
           if (targetPages.length === 0) {
@@ -761,7 +799,6 @@ const PdfToolEngine = ({ toolId }) => {
             extractedContent += `--- Page ${pageNum} ---\n` + pageStrings.join(' ') + '\n\n';
           }
         } catch (pdfErr) {
-          // Fallback parsing reading raw ArrayBuffers directly
           const rawText = new TextDecoder('latin1').decode(new Uint8Array(arrayBuffer));
           const matches = rawText.match(/\(([^()]+)\)/g) || [];
           const textChunks = matches
