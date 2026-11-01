@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Search, Calculator, ArrowRightLeft, FileText, Image as ImageIcon, 
   Download, Upload, Trash2, RotateCw, Sparkles, AlertCircle, ChevronRight,
@@ -260,7 +260,8 @@ const AdvancedCompressImage = ({ toolId }) => {
   const [width, setWidth] = useState(0);
   const [height, setHeight] = useState(0);
   const [percentage, setPercentage] = useState(50);
-  const [targetSizeKb, setTargetSizeKb] = useState('');
+  const [targetSizeVal, setTargetSizeVal] = useState('');
+  const [targetUnit, setTargetUnit] = useState('KB'); // KB or MB
   const [quality, setQuality] = useState(80);
   const [outputFormat, setOutputFormat] = useState('image/jpeg');
   const [rotation, setRotation] = useState(90);
@@ -274,6 +275,23 @@ const AdvancedCompressImage = ({ toolId }) => {
   const [result, setResult] = useState(null);
 
   const currentTool = toolId || 'compress-image';
+
+  // Live estimated file size based on dimensions/modifications
+  const estimatedSizeBytes = useMemo(() => {
+    if (!origInfo.size || origInfo.width === 0 || origInfo.height === 0) return 0;
+
+    let currentW = width;
+    let currentH = height;
+
+    if (currentTool === 'resize-percentage') {
+      currentW = Math.round(origInfo.width * (percentage / 100));
+      currentH = Math.round(origInfo.height * (percentage / 100));
+    }
+
+    const areaRatio = (currentW * currentH) / (origInfo.width * origInfo.height);
+    const estimated = origInfo.size * areaRatio * (quality / 100);
+    return Math.max(1024, Math.round(estimated));
+  }, [origInfo, width, height, percentage, quality, currentTool]);
 
   const handleFileChange = (e) => {
     const selected = e.target.files[0];
@@ -303,6 +321,23 @@ const AdvancedCompressImage = ({ toolId }) => {
       else setOutputFormat(selected.type);
     };
     img.src = url;
+  };
+
+  // Adjust width & height dynamically when target size (KB / MB) is specified
+  const handleTargetSizeChange = (val, unit = targetUnit) => {
+    setTargetSizeVal(val);
+    const numericVal = Number(val);
+    if (numericVal > 0 && origInfo.size > 0 && origInfo.width > 0 && origInfo.height > 0) {
+      const targetBytes = unit === 'MB' ? numericVal * 1024 * 1024 : numericVal * 1024;
+      if (targetBytes < origInfo.size) {
+        const ratio = Math.sqrt(targetBytes / origInfo.size);
+        const newW = Math.max(16, Math.round(origInfo.width * ratio));
+        const newH = Math.max(16, Math.round(origInfo.height * ratio));
+        setWidth(newW);
+        setHeight(newH);
+        setPercentage(Math.max(1, Math.round(ratio * 100)));
+      }
+    }
   };
 
   const processImageTool = async () => {
@@ -397,17 +432,17 @@ const AdvancedCompressImage = ({ toolId }) => {
     let finalFormat = outputFormat;
     let blob = await generateBlob(outW, outH, finalFormat, q);
 
-    // Target KB Size Reduction Logic
-    if (targetSizeKb && Number(targetSizeKb) > 0) {
-      const targetBytes = Number(targetSizeKb) * 1024;
+    // Target KB/MB Size Reduction Logic
+    const targetValNum = Number(targetSizeVal);
+    if (targetValNum > 0) {
+      const targetBytes = targetUnit === 'MB' ? targetValNum * 1024 * 1024 : targetValNum * 1024;
       if (finalFormat === 'image/png') {
-        finalFormat = 'image/jpeg'; // Convert to JPEG to compress down to size target
+        finalFormat = 'image/jpeg';
       }
 
       let currentScale = 1.0;
       let minQ = 0.05, maxQ = q;
 
-      // Quality Binary Search
       for (let i = 0; i < 8; i++) {
         const midQ = (minQ + maxQ) / 2;
         const testBlob = await generateBlob(outW, outH, finalFormat, midQ);
@@ -419,12 +454,11 @@ const AdvancedCompressImage = ({ toolId }) => {
         }
       }
 
-      // If quality reduction alone isn't enough, scale down resolution
       while (blob.size > targetBytes && currentScale > 0.1) {
         currentScale -= 0.1;
         const scaledW = Math.max(16, Math.round(outW * currentScale));
         const scaledH = Math.max(16, Math.round(outH * currentScale));
-        blob = await generateBlob(scaledW, scaledH, finalFormat, 0.5);
+        blob = await generateBlob(scaledW, scaledH, finalFormat, 0.4);
         outW = scaledW;
         outH = scaledH;
       }
@@ -482,7 +516,10 @@ const AdvancedCompressImage = ({ toolId }) => {
           <div className="p-4 bg-gray-50 rounded-xl space-y-4">
             {currentTool === 'resize-percentage' && (
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Scale Percentage (%)</label>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-xs font-semibold text-gray-600">Scale Percentage (%)</label>
+                  <span className="text-xs text-indigo-600 font-bold">Est. Size: ~{formatBytes(estimatedSizeBytes)}</span>
+                </div>
                 <input
                   type="number"
                   value={percentage}
@@ -549,31 +586,39 @@ const AdvancedCompressImage = ({ toolId }) => {
             )}
 
             {['compress-image', 'resize-image', 'change-dimensions', 'resize-pixels'].includes(currentTool) && (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Width (px)</label>
-                  <input
-                    type="number"
-                    value={width}
-                    onChange={(e) => setWidth(Number(e.target.value))}
-                    className="w-full border rounded-lg p-2 text-sm bg-white"
-                  />
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-semibold text-gray-600">Dimensions (Pixels)</span>
+                  <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                    Est. Output Size: ~{formatBytes(estimatedSizeBytes)}
+                  </span>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Height (px)</label>
-                  <input
-                    type="number"
-                    value={height}
-                    onChange={(e) => setHeight(Number(e.target.value))}
-                    className="w-full border rounded-lg p-2 text-sm bg-white"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Width (px)</label>
+                    <input
+                      type="number"
+                      value={width}
+                      onChange={(e) => setWidth(Number(e.target.value))}
+                      className="w-full border rounded-lg p-2 text-sm bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Height (px)</label>
+                    <input
+                      type="number"
+                      value={height}
+                      onChange={(e) => setHeight(Number(e.target.value))}
+                      className="w-full border rounded-lg p-2 text-sm bg-white"
+                    />
+                  </div>
                 </div>
               </div>
             )}
 
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">Output Format & Target Size Limit</label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <select
                   value={outputFormat}
                   onChange={(e) => setOutputFormat(e.target.value)}
@@ -585,11 +630,22 @@ const AdvancedCompressImage = ({ toolId }) => {
                 </select>
                 <input
                   type="number"
-                  placeholder="Target KB limit (e.g. 100)"
-                  value={targetSizeKb}
-                  onChange={(e) => setTargetSizeKb(e.target.value)}
+                  placeholder={`Target Limit (e.g. ${targetUnit === 'KB' ? '100' : '2'})`}
+                  value={targetSizeVal}
+                  onChange={(e) => handleTargetSizeChange(e.target.value)}
                   className="border rounded-lg p-2 text-sm bg-white"
                 />
+                <select
+                  value={targetUnit}
+                  onChange={(e) => {
+                    setTargetUnit(e.target.value);
+                    handleTargetSizeChange(targetSizeVal, e.target.value);
+                  }}
+                  className="border rounded-lg p-2 text-sm bg-white font-semibold"
+                >
+                  <option value="KB">KB (Kilobytes)</option>
+                  <option value="MB">MB (Megabytes)</option>
+                </select>
               </div>
             </div>
           </div>
@@ -1137,7 +1193,7 @@ const PdfToolEngine = ({ toolId }) => {
                       max="1"
                       value={opacity}
                       onChange={(e) => setOpacity(Number(e.target.value))}
-                      className="w-full border rounded-lg p-2 text-sm bg-white"
+                      className="w-full border rounded-lg p-2 text-sm bg-white font-semibold"
                     />
                   </div>
                 </div>
