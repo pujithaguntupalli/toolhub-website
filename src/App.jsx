@@ -1693,7 +1693,7 @@ const PdfToolEngine = ({ toolId }) => {
       }
     } catch (err) {
       alert(err.message || 'Error processing PDF file.');
-    } fontFinally {
+    } finally {
       setIsProcessing(false);
     }
   };
