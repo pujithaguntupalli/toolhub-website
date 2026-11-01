@@ -275,7 +275,7 @@ const AdvancedCompressImage = ({ toolId }) => {
   
   // --- FLIP IMAGE DEDICATED STATES ---
   const [flipAxis, setFlipAxis] = useState('horizontal'); // 'horizontal', 'vertical', 'dual'
-  const [flipScope, setFlipScope] = useState('full'); // 'full' (entire background) or 'selective' (selection layer)
+  const [flipScope, setFlipScope] = useState('full'); // 'full' or 'selective'
   
   const [flipHoriz, setFlipHoriz] = useState(false);
   const [flipVert, setFlipVert] = useState(false);
@@ -410,7 +410,7 @@ const AdvancedCompressImage = ({ toolId }) => {
     });
   };
 
-  // Dragging Handlers for Interactive Box (Cropper & Selective Flipping)
+  // Dragging Handlers for Interactive Box
   const startDrag = (e, type) => {
     e.stopPropagation();
     isDragging.current = true;
@@ -460,7 +460,7 @@ const AdvancedCompressImage = ({ toolId }) => {
     isDragging.current = false;
   };
 
-  // High-Resolution Processing Engine (With Flip & Rotation Logic)
+  // High-Resolution Processing Engine (With Double-Layer Artifact Fix)
   const executeImageEngine = async () => {
     if (files.length === 0) return;
     setIsProcessing(true);
@@ -515,21 +515,31 @@ const AdvancedCompressImage = ({ toolId }) => {
       ctx.imageSmoothingQuality = 'high';
 
       if (currentTool === 'flip-image' && flipScope === 'selective') {
-        // Selective / Layer Flipping Mode
+        // 1. Draw base full image first
         ctx.drawImage(bitmap, 0, 0, sourceW, sourceH, 0, 0, renderW, renderH);
 
-        const selX = Math.round((renderW * cropBox.x) / 100);
-        const selY = Math.round((renderH * cropBox.y) / 100);
-        const selW = Math.round((renderW * cropBox.w) / 100);
-        const selH = Math.round((renderH * cropBox.h) / 100);
+        // 2. Compute exact selective box pixel region
+        const srcX = Math.round((sourceW * cropBox.x) / 100);
+        const srcY = Math.round((sourceH * cropBox.y) / 100);
+        const srcW = Math.round((sourceW * cropBox.w) / 100);
+        const srcH = Math.round((sourceH * cropBox.h) / 100);
 
-        const scaleX = flipAxis === 'horizontal' || flipAxis === 'dual' ? -1 : 1;
-        const scaleY = flipAxis === 'vertical' || flipAxis === 'dual' ? -1 : 1;
+        // 3. Erase underlying selection rectangle to prevent double-image overlap artifacts
+        ctx.clearRect(srcX, srcY, srcW, srcH);
+        if (outputFormat === 'image/jpeg') {
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(srcX, srcY, srcW, srcH);
+        }
 
+        // 4. Calculate flip matrix scales
+        const scaleX = (flipAxis === 'horizontal' || flipAxis === 'dual') ? -1 : 1;
+        const scaleY = (flipAxis === 'vertical' || flipAxis === 'dual') ? -1 : 1;
+
+        // 5. Draw transformed selection slice
         ctx.save();
-        ctx.translate(selX + selW / 2, selY + selH / 2);
+        ctx.translate(srcX + srcW / 2, srcY + srcH / 2);
         ctx.scale(scaleX, scaleY);
-        ctx.drawImage(bitmap, (sourceW * cropBox.x) / 100, (sourceH * cropBox.y) / 100, (sourceW * cropBox.w) / 100, (sourceH * cropBox.h) / 100, -selW / 2, -selH / 2, selW, selH);
+        ctx.drawImage(bitmap, srcX, srcY, srcW, srcH, -srcW / 2, -srcH / 2, srcW, srcH);
         ctx.restore();
       } else if (currentTool === 'circular-crop') {
         ctx.beginPath();
