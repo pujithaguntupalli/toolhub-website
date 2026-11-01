@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Search, Calculator, ArrowRightLeft, FileText, Image as ImageIcon, 
   Download, Upload, Trash2, RotateCw, Sparkles, AlertCircle, ChevronRight,
@@ -259,9 +259,9 @@ const AdvancedCompressImage = ({ toolId }) => {
   
   const [width, setWidth] = useState(0);
   const [height, setHeight] = useState(0);
-  const [percentage, setPercentage] = useState(50);
+  const [percentage, setPercentage] = useState(100);
   const [targetSizeVal, setTargetSizeVal] = useState('');
-  const [targetUnit, setTargetUnit] = useState('KB'); // KB or MB
+  const [targetUnit, setTargetUnit] = useState('KB');
   const [quality, setQuality] = useState(80);
   const [outputFormat, setOutputFormat] = useState('image/jpeg');
   const [rotation, setRotation] = useState(90);
@@ -276,7 +276,7 @@ const AdvancedCompressImage = ({ toolId }) => {
 
   const currentTool = toolId || 'compress-image';
 
-  // Live estimated file size based on dimensions/modifications
+  // Live estimated file size calculation
   const estimatedSizeBytes = useMemo(() => {
     if (!origInfo.size || origInfo.width === 0 || origInfo.height === 0) return 0;
 
@@ -321,23 +321,6 @@ const AdvancedCompressImage = ({ toolId }) => {
       else setOutputFormat(selected.type);
     };
     img.src = url;
-  };
-
-  // Adjust width & height dynamically when target size (KB / MB) is specified
-  const handleTargetSizeChange = (val, unit = targetUnit) => {
-    setTargetSizeVal(val);
-    const numericVal = Number(val);
-    if (numericVal > 0 && origInfo.size > 0 && origInfo.width > 0 && origInfo.height > 0) {
-      const targetBytes = unit === 'MB' ? numericVal * 1024 * 1024 : numericVal * 1024;
-      if (targetBytes < origInfo.size) {
-        const ratio = Math.sqrt(targetBytes / origInfo.size);
-        const newW = Math.max(16, Math.round(origInfo.width * ratio));
-        const newH = Math.max(16, Math.round(origInfo.height * ratio));
-        setWidth(newW);
-        setHeight(newH);
-        setPercentage(Math.max(1, Math.round(ratio * 100)));
-      }
-    }
   };
 
   const processImageTool = async () => {
@@ -428,11 +411,9 @@ const AdvancedCompressImage = ({ toolId }) => {
       return new Promise((res) => canvas.toBlob(res, fmt, q));
     };
 
-    let q = quality / 100;
     let finalFormat = outputFormat;
-    let blob = await generateBlob(outW, outH, finalFormat, q);
+    let blob = await generateBlob(outW, outH, finalFormat, quality / 100);
 
-    // Target KB/MB Size Reduction Logic
     const targetValNum = Number(targetSizeVal);
     if (targetValNum > 0) {
       const targetBytes = targetUnit === 'MB' ? targetValNum * 1024 * 1024 : targetValNum * 1024;
@@ -440,27 +421,33 @@ const AdvancedCompressImage = ({ toolId }) => {
         finalFormat = 'image/jpeg';
       }
 
-      let currentScale = 1.0;
-      let minQ = 0.05, maxQ = q;
+      // Quality Binary Search to land as close to targetBytes as possible
+      let minQ = 0.05, maxQ = 0.98;
+      let bestBlob = blob;
 
-      for (let i = 0; i < 8; i++) {
+      for (let i = 0; i < 10; i++) {
         const midQ = (minQ + maxQ) / 2;
         const testBlob = await generateBlob(outW, outH, finalFormat, midQ);
         if (testBlob.size <= targetBytes) {
-          blob = testBlob;
+          bestBlob = testBlob;
           minQ = midQ;
         } else {
           maxQ = midQ;
         }
       }
+      blob = bestBlob;
 
-      while (blob.size > targetBytes && currentScale > 0.1) {
-        currentScale -= 0.1;
-        const scaledW = Math.max(16, Math.round(outW * currentScale));
-        const scaledH = Math.max(16, Math.round(outH * currentScale));
-        blob = await generateBlob(scaledW, scaledH, finalFormat, 0.4);
-        outW = scaledW;
-        outH = scaledH;
+      // Dimension scaling ONLY if minimum quality still exceeds targetBytes
+      if (blob.size > targetBytes) {
+        let currentScale = 0.95;
+        while (blob.size > targetBytes && currentScale > 0.1) {
+          const scaledW = Math.max(16, Math.round(outW * currentScale));
+          const scaledH = Math.max(16, Math.round(outH * currentScale));
+          blob = await generateBlob(scaledW, scaledH, finalFormat, 0.7);
+          outW = scaledW;
+          outH = scaledH;
+          currentScale -= 0.05;
+        }
       }
     }
 
@@ -474,7 +461,7 @@ const AdvancedCompressImage = ({ toolId }) => {
       height: outH,
       size: blob.size,
       reduction: (((origInfo.size - blob.size) / origInfo.size) * 100).toFixed(1),
-      fileName: `processed_${file.name.split('.')[0]}.${ext}`
+      fileName: `compressed_${file.name.split('.')[0]}.${ext}`
     });
     setIsProcessing(false);
   };
@@ -518,7 +505,7 @@ const AdvancedCompressImage = ({ toolId }) => {
               <div>
                 <div className="flex justify-between items-center mb-1">
                   <label className="text-xs font-semibold text-gray-600">Scale Percentage (%)</label>
-                  <span className="text-xs text-indigo-600 font-bold">Est. Size: ~{formatBytes(estimatedSizeBytes)}</span>
+                  <span className="text-xs text-indigo-600 font-bold">Est. Output Size: ~{formatBytes(estimatedSizeBytes)}</span>
                 </div>
                 <input
                   type="number"
@@ -630,17 +617,14 @@ const AdvancedCompressImage = ({ toolId }) => {
                 </select>
                 <input
                   type="number"
-                  placeholder={`Target Limit (e.g. ${targetUnit === 'KB' ? '100' : '2'})`}
+                  placeholder={`Target Limit (e.g. ${targetUnit === 'KB' ? '50' : '2'})`}
                   value={targetSizeVal}
-                  onChange={(e) => handleTargetSizeChange(e.target.value)}
+                  onChange={(e) => setTargetSizeVal(e.target.value)}
                   className="border rounded-lg p-2 text-sm bg-white"
                 />
                 <select
                   value={targetUnit}
-                  onChange={(e) => {
-                    setTargetUnit(e.target.value);
-                    handleTargetSizeChange(targetSizeVal, e.target.value);
-                  }}
+                  onChange={(e) => setTargetUnit(e.target.value)}
                   className="border rounded-lg p-2 text-sm bg-white font-semibold"
                 >
                   <option value="KB">KB (Kilobytes)</option>
