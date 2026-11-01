@@ -87,8 +87,7 @@ export const IMAGE_TOOLS = [
   { id: 'circular-crop', name: 'Circular Image Crop', description: 'Crop image into a round circular badge with transparent corners.', keywords: ['circle', 'round', 'profile', 'avatar', 'badge'] },
   { id: 'grayscale-image', name: 'Grayscale Filter', description: 'Convert colored images into black & white with desaturation and high-contrast threshold controls.', keywords: ['grayscale', 'black white', 'monochrome', 'filter', 'desaturate'] },
   { id: 'blur-image', name: 'Blur Image', description: 'Apply privacy blur across full canvas or selected regions to censor sensitive information.', keywords: ['blur', 'censor', 'filter', 'privacy', 'obfuscate'] },
-  { id: 'add-text-image', name: 'Add Text to Image', description: 'Overlay customizable text watermarks, captions, or titles with opacity and font size options.', keywords: ['text', 'watermark', 'caption', 'overlay', 'title'] },
-  { id: 'remove-metadata', name: 'Remove Metadata', description: 'Strip EXIF privacy details, camera tags, and GPS coordinates without altering photo quality.', keywords: ['exif', 'metadata', 'privacy', 'gps', 'strip', 'clean'] }
+  { id: 'add-text-image', name: 'Add Text to Image', description: 'Overlay customizable text watermarks, captions, or titles with opacity and font size options.', keywords: ['text', 'watermark', 'caption', 'overlay', 'title'] }
 ];
 
 // --- PDF TOOLS DEFINITION ---
@@ -317,13 +316,6 @@ const AdvancedCompressImage = ({ toolId }) => {
 
   const currentTool = toolId || 'format-converter';
   const activeInfo = origInfos[activeFileIdx] || { width: 0, height: 0, size: 0, url: '', format: 'image/jpeg' };
-
-  // --- AUTO-SET 100% QUALITY FOR METADATA REMOVAL ---
-  useEffect(() => {
-    if (currentTool === 'remove-metadata') {
-      setQuality(100);
-    }
-  }, [currentTool]);
 
   useEffect(() => {
     if (toolId === 'resize-percentage') {
@@ -661,19 +653,6 @@ const AdvancedCompressImage = ({ toolId }) => {
           ctx.restore();
         }
       }
-      // --- 4. DEDICATED REMOVE METADATA ENGINE (EXIF / GPS STRIP FIX) ---
-      else if (currentTool === 'remove-metadata') {
-        // Clear canvas buffer completely to erase any inherited metadata tracks
-        ctx.clearRect(0, 0, renderW, renderH);
-        
-        if (effectiveFormat === 'image/jpeg') {
-          ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(0, 0, renderW, renderH);
-        }
-
-        // Draw clean raw pixels directly into pristine canvas context
-        ctx.drawImage(bitmap, 0, 0, renderW, renderH);
-      }
       // --- OTHER TOOLS ---
       else if (currentTool === 'make-square') {
         const side = renderW;
@@ -822,8 +801,6 @@ const AdvancedCompressImage = ({ toolId }) => {
             ? 'Apply smooth privacy Gaussian blur across full canvas or draggable selective regions.'
             : currentTool === 'add-text-image'
             ? 'Overlay customizable text captions, titles, or watermarks with positioning and opacity controls.'
-            : currentTool === 'remove-metadata'
-            ? 'Strip all EXIF data, camera details, and GPS location tags to secure photo privacy before sharing.'
             : 'Client-side image processing suite.'}
         </p>
       </div>
@@ -1173,53 +1150,6 @@ const AdvancedCompressImage = ({ toolId }) => {
                       {watermarkText || 'Sample Text'}
                     </div>
                   )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* --- 4. DEDICATED REMOVE METADATA TOOL --- */}
-          {currentTool === 'remove-metadata' && (
-            <div className="space-y-4">
-              <div className="p-5 bg-amber-50/70 border border-amber-200 rounded-xl space-y-3">
-                <div className="flex items-start space-x-3">
-                  <Shield className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="font-bold text-amber-900 text-sm">EXIF Privacy Protection Active</h4>
-                    <p className="text-xs text-amber-700 mt-0.5">
-                      Exporting your photos with this tool strips invisible metadata, including GPS camera location coordinates, device models, and timestamp headers without reducing visible image resolution.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
-                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Detected Metadata Tags (Will Be Stripped)</h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-                  <div className="p-2.5 bg-white border rounded-lg">
-                    <span className="text-gray-400 block text-[10px]">FILE NAME</span>
-                    <span className="font-bold text-gray-800 truncate block">{activeInfo.name}</span>
-                  </div>
-                  <div className="p-2.5 bg-white border rounded-lg">
-                    <span className="text-gray-400 block text-[10px]">FILE TYPE</span>
-                    <span className="font-bold text-gray-800 uppercase">{activeInfo.type.replace('image/', '')}</span>
-                  </div>
-                  <div className="p-2.5 bg-white border rounded-lg">
-                    <span className="text-gray-400 block text-[10px]">GPS LOCATION TAG</span>
-                    <span className="font-bold text-red-600">Stripped on Export</span>
-                  </div>
-                  <div className="p-2.5 bg-white border rounded-lg">
-                    <span className="text-gray-400 block text-[10px]">RESOLUTION</span>
-                    <span className="font-bold text-gray-800">{activeInfo.width} × {activeInfo.height} px</span>
-                  </div>
-                  <div className="p-2.5 bg-white border rounded-lg">
-                    <span className="text-gray-400 block text-[10px]">MODIFIED TIMESTAMP</span>
-                    <span className="font-bold text-gray-800 truncate block">{activeInfo.lastModified || 'Detected'}</span>
-                  </div>
-                  <div className="p-2.5 bg-white border rounded-lg">
-                    <span className="text-gray-400 block text-[10px]">EXIF CAMERA HEADERS</span>
-                    <span className="font-bold text-red-600">Stripped on Export</span>
-                  </div>
                 </div>
               </div>
             </div>
