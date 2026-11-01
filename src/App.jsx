@@ -248,7 +248,6 @@ const IconRenderer = ({ name, className = "w-5 h-5" }) => {
 };
 
 const AdvancedCompressImage = ({ toolId }) => {
-  // Batch Upload File Management
   const [files, setFiles] = useState([]);
   const [activeFileIdx, setActiveFileIdx] = useState(0);
   const [origInfos, setOrigInfos] = useState([]);
@@ -275,20 +274,20 @@ const AdvancedCompressImage = ({ toolId }) => {
   const [circleCenterY, setCircleCenterY] = useState(50); 
 
   // --- 1. GRAYSCALE FILTER SPECIFIC STATES ---
-  const [grayscaleMode, setGrayscaleMode] = useState('desaturate'); // 'desaturate' or 'threshold'
-  const [grayscaleAmount, setGrayscaleAmount] = useState(100); // 0% to 100%
-  const [bwThreshold, setBwThreshold] = useState(128); // 0 to 255 cutoff for high contrast B&W
+  const [grayscaleMode, setGrayscaleMode] = useState('desaturate');
+  const [grayscaleAmount, setGrayscaleAmount] = useState(100);
+  const [bwThreshold, setBwThreshold] = useState(128);
 
   // --- 2. BLUR IMAGE SPECIFIC STATES ---
-  const [blurMode, setBlurMode] = useState('full'); // 'full' canvas or 'selective' box
-  const [blurRadius, setBlurRadius] = useState(8); // Blur radius in px (1 to 50)
+  const [blurMode, setBlurMode] = useState('full');
+  const [blurRadius, setBlurRadius] = useState(8);
 
   // --- 3. ADD TEXT TO IMAGE SPECIFIC STATES ---
   const [watermarkText, setWatermarkText] = useState('SAMPLE WATERMARK');
-  const [textPosition, setTextPosition] = useState('bottom'); // 'top', 'center', 'bottom', 'custom'
+  const [textPosition, setTextPosition] = useState('bottom');
   const [textColor, setTextColor] = useState('#ffffff');
-  const [textSizeRatio, setTextSizeRatio] = useState(40); // Font size slider relative to image width
-  const [textOpacity, setTextOpacity] = useState(90); // 10% to 100%
+  const [textSizeRatio, setTextSizeRatio] = useState(40);
+  const [textOpacity, setTextOpacity] = useState(90);
 
   // --- CROPPER, FLIP & GENERIC CANVAS STATES ---
   const [cropRatioPreset, setCropRatioPreset] = useState('Freeform');
@@ -571,34 +570,32 @@ const AdvancedCompressImage = ({ toolId }) => {
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
 
-      // --- 1. DEDICATED GRAYSCALE FILTER ENGINE ---
+      // --- 1. DEDICATED GRAYSCALE FILTER ENGINE (DIRECT FILTER EXPORT FIX) ---
       if (currentTool === 'grayscale-image') {
-        ctx.drawImage(bitmap, 0, 0, renderW, renderH);
-        const imgData = ctx.getImageData(0, 0, renderW, renderH);
-        const data = imgData.data;
-        const factor = grayscaleAmount / 100;
+        ctx.save();
+        if (grayscaleMode === 'threshold') {
+          ctx.filter = `contrast(200%) grayscale(${grayscaleAmount}%)`;
+          ctx.drawImage(bitmap, 0, 0, renderW, renderH);
+          ctx.restore();
 
-        for (let j = 0; j < data.length; j += 4) {
-          const r = data[j];
-          const g = data[j + 1];
-          const b = data[j + 2];
-          
-          // Perceptual Luminance formula
-          const gray = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+          // Apply binary high-contrast cutoff directly to canvas pixels
+          const imgData = ctx.getImageData(0, 0, renderW, renderH);
+          const data = imgData.data;
+          const factor = grayscaleAmount / 100;
 
-          if (grayscaleMode === 'threshold') {
+          for (let j = 0; j < data.length; j += 4) {
+            const gray = 0.2126 * data[j] + 0.7152 * data[j + 1] + 0.0722 * data[j + 2];
             const finalVal = gray >= bwThreshold ? 255 : 0;
-            data[j] = r + (finalVal - r) * factor;
-            data[j + 1] = g + (finalVal - g) * factor;
-            data[j + 2] = b + (finalVal - b) * factor;
-          } else {
-            // Standard Desaturation
-            data[j] = r + (gray - r) * factor;
-            data[j + 1] = g + (gray - g) * factor;
-            data[j + 2] = b + (gray - b) * factor;
+            data[j] = data[j] + (finalVal - data[j]) * factor;
+            data[j + 1] = data[j + 1] + (finalVal - data[j + 1]) * factor;
+            data[j + 2] = data[j + 2] + (finalVal - data[j + 2]) * factor;
           }
+          ctx.putImageData(imgData, 0, 0);
+        } else {
+          ctx.filter = `grayscale(${grayscaleAmount}%)`;
+          ctx.drawImage(bitmap, 0, 0, renderW, renderH);
+          ctx.restore();
         }
-        ctx.putImageData(imgData, 0, 0);
       }
       // --- 2. DEDICATED BLUR IMAGE ENGINE ---
       else if (currentTool === 'blur-image') {
@@ -608,7 +605,6 @@ const AdvancedCompressImage = ({ toolId }) => {
           ctx.drawImage(bitmap, 0, 0, renderW, renderH);
           ctx.restore();
         } else {
-          // Selective Region Blur
           ctx.drawImage(bitmap, 0, 0, renderW, renderH);
           const bx = Math.round((renderW * cropBox.x) / 100);
           const by = Math.round((renderH * cropBox.y) / 100);
@@ -649,7 +645,6 @@ const AdvancedCompressImage = ({ toolId }) => {
           ctx.save();
           ctx.globalAlpha = textOpacity / 100;
 
-          // Soft Text Drop Shadow
           ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
           ctx.shadowBlur = 6;
           ctx.shadowOffsetX = 2;
@@ -662,10 +657,9 @@ const AdvancedCompressImage = ({ toolId }) => {
       }
       // --- 4. DEDICATED REMOVE METADATA ENGINE ---
       else if (currentTool === 'remove-metadata') {
-        // Redrawing the bitmap onto a fresh clean canvas strips all EXIF headers & GPS tags
         ctx.drawImage(bitmap, 0, 0, renderW, renderH);
       }
-      // --- OTHER TOOLS (MAKE SQUARE, CIRCULAR CROP, FLIP, CROP, ROTATE, etc.) ---
+      // --- OTHER TOOLS ---
       else if (currentTool === 'make-square') {
         const side = renderW;
 
@@ -942,7 +936,6 @@ const AdvancedCompressImage = ({ toolId }) => {
                 )}
               </div>
 
-              {/* Grayscale Preview */}
               <div className="w-full h-[320px] bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center p-4">
                 <img
                   src={activeInfo.url}
@@ -1003,7 +996,6 @@ const AdvancedCompressImage = ({ toolId }) => {
                 </div>
               </div>
 
-              {/* Blur Live Canvas Viewport */}
               <div
                 ref={containerRef}
                 onMouseMove={onMouseMove}
@@ -1116,7 +1108,6 @@ const AdvancedCompressImage = ({ toolId }) => {
                 </div>
               </div>
 
-              {/* Text Overlay Preview */}
               <div
                 ref={containerRef}
                 onMouseMove={onMouseMove}
@@ -1187,7 +1178,6 @@ const AdvancedCompressImage = ({ toolId }) => {
                 </div>
               </div>
 
-              {/* Detected Metadata Properties */}
               <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
                 <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Detected Metadata Tags (Will Be Stripped)</h4>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
@@ -1703,7 +1693,7 @@ const PdfToolEngine = ({ toolId }) => {
       }
     } catch (err) {
       alert(err.message || 'Error processing PDF file.');
-    } finally {
+    } fontFinally {
       setIsProcessing(false);
     }
   };
