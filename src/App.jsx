@@ -31,7 +31,48 @@ const CONVERTER_DATA = [
 ];
 
 const fmt = (n) => Number.isFinite(n) ? Number(n.toPrecision(11)).toLocaleString('en-US', { maximumFractionDigits: 8 }) : '—';
+const toTempBase = (n, unit) => unit === 'Celsius' ? n : unit === 'Fahrenheit' ? (n - 32) * 5 / 9 : n - 273.15;
+const fromTempBase = (c, unit) => unit === 'Celsius' ? c : unit === 'Fahrenheit' ? c * 9 / 5 + 32 : c + 273.15;
 
+function convertUnits(slug, amount, from, to) {
+  if (slug === 'temperature') {
+    const num = typeof amount === 'number' ? amount : parseFloat(amount);
+    if (!Number.isFinite(num)) return null;
+    const c = toTempBase(num, from);
+    if (c < -273.15) return null;
+    return fmt(fromTempBase(c, to));
+  }
+  if (slug === 'number-system') {
+    const radixFrom = from.startsWith('Binary') ? 2 : from.startsWith('Octal') ? 8 : from.startsWith('Hex') ? 16 : 10;
+    const radixTo = to.startsWith('Binary') ? 2 : to.startsWith('Octal') ? 8 : to.startsWith('Hex') ? 16 : 10;
+    const digits = String(amount).trim().replace(/^[-+]/, '');
+    const patterns = { 2: /^[01]+$/, 8: /^[0-7]+$/, 10: /^\d+$/, 16: /^[\da-f]+$/i };
+    if (!patterns[radixFrom]?.test(digits)) return null;
+    const integer = parseInt(String(amount), radixFrom);
+    return Number.isFinite(integer) ? integer.toString(radixTo).toUpperCase() : null;
+  }
+  const toolEntry = CONVERTER_DATA.find(([s]) => s === slug || `${s}-conv` === slug);
+  if (!toolEntry) return null;
+  const units = toolEntry[4];
+  const num = typeof amount === 'number' ? amount : parseFloat(amount);
+  if (!Number.isFinite(num)) return null;
+
+  if (slug === 'fuel-economy' && (from.includes('Liters per 100') || to.includes('Liters per 100'))) {
+    if (num <= 0) return null;
+    const uFrom = units.find(([l]) => l === from);
+    const kmPerLiter = from.includes('Liters per 100') ? 100 / num : num * (uFrom ? uFrom[1] : 1);
+    if (!Number.isFinite(kmPerLiter) || kmPerLiter <= 0) return null;
+    const uTo = units.find(([l]) => l === to);
+    return fmt(to.includes('Liters per 100') ? 100 / kmPerLiter : kmPerLiter / (uTo ? uTo[1] : 1));
+  }
+
+  const uFrom = units.find(([l]) => l === from);
+  const uTo = units.find(([l]) => l === to);
+  if (!uFrom || !uTo) return null;
+  return fmt(num * uFrom[1] / uTo[1]);
+}
+
+// --- IMAGE TOOLS DEFINITION ---
 export const IMAGE_TOOLS = [
   { id: 'compress-image', name: 'Compress Image', description: 'Reduce image file size (KB/MB) while keeping pixel dimensions sharp.', keywords: ['compress', 'jpg', 'png', 'webp', 'reduce size', 'kb', 'mb'] },
   { id: 'resize-image', name: 'Resize Image', description: 'Batch scale resolution with px/% controls, aspect ratio lock & live file size estimator.', keywords: ['resize', 'dimensions', 'width', 'height', 'scale', 'pixels', 'batch'] },
@@ -42,12 +83,39 @@ export const IMAGE_TOOLS = [
   { id: 'png-to-jpg', name: 'PNG to JPG', description: 'Convert PNG images to JPG format.', keywords: ['png', 'jpg', 'convert'] },
   { id: 'webp-to-jpg', name: 'WEBP to JPG', description: 'Convert WEBP images to JPG format.', keywords: ['webp', 'jpg', 'convert'] },
   { id: 'jpg-to-webp', name: 'JPG to WEBP', description: 'Convert JPG images to WebP format.', keywords: ['jpg', 'webp', 'convert'] },
-  { id: 'png-to-webp', name: 'PNG to WEBP', description: 'Convert PNG images to WebP format.', keywords: ['png', 'webp', 'convert'] }
+  { id: 'png-to-webp', name: 'PNG to WEBP', description: 'Convert PNG images to WebP format.', keywords: ['png', 'webp', 'convert'] },
+  { id: 'format-converter', name: 'Image Format Converter', description: 'Universal format converter (JPG, PNG, WEBP).', keywords: ['format', 'convert', 'image'] },
+  { id: 'change-dimensions', name: 'Change Dimensions', description: 'Set specific width and height in pixels.', keywords: ['dimensions', 'px', 'resize'] },
+  { id: 'resize-percentage', name: 'Resize by Percentage', description: 'Scale image size by percentage.', keywords: ['percentage', 'scale'] },
+  { id: 'resize-pixels', name: 'Resize by Pixels', description: 'Scale image resolution directly.', keywords: ['pixels', 'resolution'] },
+  { id: 'make-square', name: 'Make Image Square', description: 'Crop image into a 1:1 square aspect ratio.', keywords: ['square', '1:1', 'avatar'] },
+  { id: 'circular-crop', name: 'Circular Image Crop', description: 'Crop image into a round circular badge.', keywords: ['circle', 'round', 'profile'] },
+  { id: 'grayscale-image', name: 'Grayscale Filter', description: 'Convert colored images into black & white.', keywords: ['grayscale', 'black white', 'monochrome'] },
+  { id: 'blur-image', name: 'Blur Image', description: 'Apply privacy blur filter to your images.', keywords: ['blur', 'censor', 'filter'] },
+  { id: 'add-text-image', name: 'Add Text to Image', description: 'Overlay watermark or caption text on photos.', keywords: ['text', 'watermark', 'caption'] },
+  { id: 'remove-metadata', name: 'Remove Metadata', description: 'Strip EXIF privacy details and camera tags.', keywords: ['exif', 'metadata', 'privacy'] }
 ];
 
+// --- PDF TOOLS DEFINITION ---
 export const PDF_TOOLS = [
   { id: "merge-pdf", name: "Merge PDF", description: "Combine PDF files in the order selected.", supported: true, keywords: ["combine", "join"] },
-  { id: "split-pdf", name: "Split PDF", description: "Extract selected pages into one single PDF document.", supported: true, keywords: ["separate", "divide"] }
+  { id: "split-pdf", name: "Split PDF", description: "Extract selected pages into one single PDF document.", supported: true, keywords: ["separate", "divide"] },
+  { id: "compress-pdf", name: "Compress PDF", description: "Optimize and reduce PDF document size.", supported: true, keywords: ["reduce", "size"] },
+  { id: "rotate-pdf", name: "Rotate PDF", description: "Rotate all or specific pages by 90, 180, or 270 degrees.", supported: true, keywords: ["turn"] },
+  { id: "delete-pdf-pages", name: "Delete PDF Pages", description: "Remove specific pages from a PDF.", supported: true, keywords: ["remove"] },
+  { id: "extract-pdf-pages", name: "Extract PDF Pages", description: "Extract specified pages into a new PDF document.", supported: true, keywords: ["copy"] },
+  { id: "reorder-pdf-pages", name: "Reorder PDF Pages", description: "Reorganize pages using a custom page sequence.", supported: true, keywords: ["organize", "sort"] },
+  { id: "add-page-numbers", name: "Add Page Numbers", description: "Place customizable page numbers on every page.", supported: true, keywords: ["numbering"] },
+  { id: "add-watermark", name: "Add Watermark", description: "Place a custom text watermark across every page.", supported: true, keywords: ["stamp", "text"] },
+  { id: "images-to-pdf", name: "Images to PDF", description: "Combine JPEG or PNG images into a PDF.", supported: true, keywords: ["photo"] },
+  { id: "jpg-to-pdf", name: "JPG to PDF", description: "Convert JPEG images into PDF pages.", supported: true, keywords: ["jpeg", "photo"] },
+  { id: "png-to-pdf", name: "PNG to PDF", description: "Convert PNG images into PDF pages.", supported: true, keywords: ["photo"] },
+  { id: "pdf-to-jpg", name: "PDF to JPG", description: "Render PDF pages into JPEG images.", supported: true, keywords: ["convert", "image"] },
+  { id: "pdf-to-png", name: "PDF to PNG", description: "Render PDF pages into PNG images.", supported: true, keywords: ["convert", "image"] },
+  { id: "extract-pdf-text", name: "Extract PDF Text", description: "Extract selectable text content from specific pages into a plain text file.", supported: true, keywords: ["copy", "plain text", "read text"] },
+  { id: "add-text-to-pdf", name: "Add Text to PDF", description: "Annotate and add customizable text lines to pages.", supported: true, keywords: ["write", "annotate"] },
+  { id: "crop-pdf-pages", name: "Crop PDF Pages", description: "Trim page margins by applying custom margins.", supported: true, keywords: ["trim"] },
+  { id: "organize-pdf-pages", name: "Organize PDF Pages", description: "Filter or rearrange PDF page structure.", supported: true, keywords: ["reorder", "sort"] }
 ];
 
 const formatBytes = (bytes, decimals = 2) => {
@@ -70,11 +138,42 @@ const TOOLS = [
     keywords: keywords.join(' '),
     units
   })),
+
+  { id: 'percentage-calc', name: 'Percentage Calculator', category: 'calculators', icon: 'Percent', desc: 'Find a percentage of a value, or the percentage one value is of another.', keywords: 'percent rate of fraction' },
+  { id: 'age-calc', name: 'Age Calculator', category: 'calculators', icon: 'Clock', desc: 'Calculate age in years, months and days from a birth date.', keywords: 'birthday birth date how old living' },
+  { id: 'bmi-calc', name: 'BMI Calculator', category: 'calculators', icon: 'Activity', desc: 'Estimate body mass index from height and weight.', keywords: 'body mass index health weight fitness' },
+  { id: 'simple-interest', name: 'Simple Interest Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Estimate simple interest and total value over time.', keywords: 'interest principal finance money rate' },
+  { id: 'compound-interest', name: 'Compound Interest Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Estimate compounded growth and interest earned.', keywords: 'investment annual compound finance savings wealth' },
+  { id: 'loan-emi', name: 'Loan EMI Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Estimate a fixed monthly loan payment and total repayment.', keywords: 'mortgage monthly payment loan bank car' },
+  { id: 'gst-calc', name: 'GST / Sales Tax Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Add or remove a goods and services tax rate.', keywords: 'tax vat sales tax price gross net' },
+  { id: 'discount-calc', name: 'Discount Calculator', category: 'calculators', icon: 'Percent', desc: 'Find the sale price and amount saved after a discount.', keywords: 'sale price markdown savings shopping' },
+  { id: 'profit-loss', name: 'Profit and Loss Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Compare selling and cost prices to find profit or loss.', keywords: 'margin markup business revenue' },
+  { id: 'salary-calc', name: 'Salary / Wage Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Convert gross salary between common pay periods.', keywords: 'paycheck annual hourly income wage' },
+  { id: 'date-diff', name: 'Date Difference Calculator', category: 'calculators', icon: 'Clock', desc: 'Count the calendar days between two dates.', keywords: 'days between date range duration calendar' },
+  { id: 'time-duration', name: 'Time Duration Calculator', category: 'calculators', icon: 'Clock', desc: 'Find elapsed time between clock times, including overnight intervals.', keywords: 'hours between elapsed clock timer' },
+  { id: 'average-calc', name: 'Average Calculator', category: 'calculators', icon: 'Calculator', desc: 'Calculate the arithmetic mean of a list of values.', keywords: 'mean numbers statistics median data' },
+  { id: 'ratio-calc', name: 'Ratio Calculator', category: 'calculators', icon: 'Calculator', desc: 'Simplify a two-part ratio and find its share.', keywords: 'proportion scale simplify aspect divide' },
+  { id: 'fraction-calc', name: 'Fraction Calculator', category: 'calculators', icon: 'Calculator', desc: 'Simplify a fraction and show its decimal value.', keywords: 'numerator denominator reduce math' },
+  { id: 'scientific-calc', name: 'Scientific Calculator', category: 'calculators', icon: 'Calculator', desc: 'Evaluate a scientific operation on one or two values.', keywords: 'sin cos log sqrt exponent trig' },
+  { id: 'basic-calc', name: 'Basic Calculator', category: 'calculators', icon: 'Calculator', desc: 'Quickly evaluate two values with a basic arithmetic operation.', keywords: 'arithmetic add subtract multiply divide math' },
+  { id: 'hcf-lcm', name: 'HCF and LCM Calculator', category: 'calculators', icon: 'Calculator', desc: 'Find the highest common factor and least common multiple.', keywords: 'gcd greatest common divisor multiple prime' },
+  { id: 'unit-price', name: 'Unit Price Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Compare cost per standard unit for shopping decisions.', keywords: 'price per unit compare value cost grocery' },
+  { id: 'savings-goal', name: 'Savings Goal Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Estimate the monthly amount needed to reach a savings target.', keywords: 'saving plan monthly savings goal target' },
+
   ...IMAGE_TOOLS.map(t => ({
     id: t.id,
     name: t.name,
     category: 'image',
     icon: 'ImageIcon',
+    desc: t.description,
+    keywords: t.keywords.join(' ')
+  })),
+
+  ...PDF_TOOLS.map(t => ({
+    id: t.id,
+    name: t.name,
+    category: 'pdf',
+    icon: 'FileText',
     desc: t.description,
     keywords: t.keywords.join(' ')
   }))
@@ -88,23 +187,32 @@ const IconRenderer = ({ name, className = "w-5 h-5" }) => {
     ArrowRightLeft: <ArrowRightLeft className={className} />,
     Scale: <Scale className={className} />,
     Thermometer: <Thermometer className={className} />,
+    Box: <Box className={className} />,
+    Volume2: <Volume2 className={className} />,
+    Compass: <Compass className={className} />,
+    Flame: <Flame className={className} />,
+    Cpu: <Cpu className={className} />,
+    HardDrive: <HardDrive className={className} />,
+    Database: <Database className={className} />,
     ImageIcon: <ImageIcon className={className} />,
     Maximize2: <Maximize2 className={className} />,
     Crop: <Crop className={className} />,
     RotateCw: <RotateCw className={className} />,
-    FileText: <FileText className={className} />
+    Shield: <Shield className={className} />,
+    FileText: <FileText className={className} />,
+    Trash2: <Trash2 className={className} />,
+    Layers: <Layers className={className} />
   };
   return icons[name] || <Sparkles className={className} />;
 };
 
 const AdvancedCompressImage = ({ toolId }) => {
-  // Batch Upload File Management
   const [files, setFiles] = useState([]);
   const [activeFileIdx, setActiveFileIdx] = useState(0);
   const [origInfos, setOrigInfos] = useState([]);
 
-  // --- IMAGE RESIZER STATES ---
-  const [resizeMode, setResizeMode] = useState('px'); // 'px' or '%'
+  // --- RESIZER STATES ---
+  const [resizeMode, setResizeMode] = useState('px');
   const [width, setWidth] = useState(0);
   const [height, setHeight] = useState(0);
   const [pctVal, setPctVal] = useState(100);
@@ -112,16 +220,15 @@ const AdvancedCompressImage = ({ toolId }) => {
   const [quality, setQuality] = useState(85);
   const [outputFormat, setOutputFormat] = useState('image/jpeg');
 
-  // --- IMAGE CROPPER STATES ---
+  // --- CROPPER STATES ---
   const [cropRatioPreset, setCropRatioPreset] = useState('Freeform');
-  const [gridOverlay, setGridOverlay] = useState('thirds'); // 'none', 'thirds', 'golden'
-  const [rotationAngle, setRotationAngle] = useState(0); // -180 to 180 continuous degrees
+  const [gridOverlay, setGridOverlay] = useState('thirds');
+  const [rotationAngle, setRotationAngle] = useState(0);
   const [flipHoriz, setFlipHoriz] = useState(false);
   const [flipVert, setFlipVert] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [panPos, setPanPos] = useState({ x: 0, y: 0 });
 
-  // Interactive Bounding Box percentages [x, y, w, h] relative to container
   const [cropBox, setCropBox] = useState({ x: 10, y: 10, w: 80, h: 80 });
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -129,7 +236,7 @@ const AdvancedCompressImage = ({ toolId }) => {
 
   const containerRef = useRef(null);
   const isDragging = useRef(false);
-  const dragType = useRef(null); // 'move', 'nw', 'ne', 'sw', 'se', 'pan'
+  const dragType = useRef(null);
   const startMouse = useRef({ x: 0, y: 0 });
   const startBox = useRef({ x: 0, y: 0, w: 0, h: 0 });
   const startPan = useRef({ x: 0, y: 0 });
@@ -138,7 +245,6 @@ const AdvancedCompressImage = ({ toolId }) => {
   const activeFile = files[activeFileIdx];
   const activeInfo = origInfos[activeFileIdx] || { width: 0, height: 0, size: 0 };
 
-  // Live File Size Estimator
   const estimatedSizeBytes = useMemo(() => {
     if (!activeInfo.size || activeInfo.width === 0 || activeInfo.height === 0) return 0;
     let targetW = width;
@@ -190,7 +296,6 @@ const AdvancedCompressImage = ({ toolId }) => {
     });
   };
 
-  // Resizer Manual Pixel Controls
   const handleWidthInput = (val) => {
     const w = Number(val);
     setWidth(w);
@@ -207,7 +312,6 @@ const AdvancedCompressImage = ({ toolId }) => {
     }
   };
 
-  // Resizer Preset Shortcuts
   const applyPresetScaling = (percent) => {
     setPctVal(percent);
     if (!activeInfo.width || !activeInfo.height) return;
@@ -217,7 +321,6 @@ const AdvancedCompressImage = ({ toolId }) => {
     setHeight(scaledH);
   };
 
-  // Cropper Aspect Ratio Presets
   const applyCropRatio = (preset) => {
     setCropRatioPreset(preset);
     if (preset === 'Freeform') return;
@@ -246,7 +349,6 @@ const AdvancedCompressImage = ({ toolId }) => {
     });
   };
 
-  // Dragging Handlers for Cropper Box
   const startDrag = (e, type) => {
     e.stopPropagation();
     isDragging.current = true;
@@ -296,7 +398,6 @@ const AdvancedCompressImage = ({ toolId }) => {
     isDragging.current = false;
   };
 
-  // High-Resolution Batch Processing Engine
   const executeImageEngine = async () => {
     if (files.length === 0) return;
     setIsProcessing(true);
@@ -410,7 +511,6 @@ const AdvancedCompressImage = ({ toolId }) => {
             </div>
           )}
 
-          {/* --- CROPPER TOOL UI --- */}
           {currentTool === 'crop-image' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between bg-gray-100 p-2.5 rounded-xl text-xs font-semibold">
@@ -432,7 +532,6 @@ const AdvancedCompressImage = ({ toolId }) => {
                 </div>
               </div>
 
-              {/* Interactive View Box */}
               <div
                 ref={containerRef}
                 onMouseDown={(e) => startDrag(e, 'pan')}
@@ -453,7 +552,6 @@ const AdvancedCompressImage = ({ toolId }) => {
                   className="pointer-events-none transition-transform duration-75"
                 />
 
-                {/* Bounding Box Overlay */}
                 <div
                   style={{
                     left: `${cropBox.x}%`,
@@ -464,7 +562,6 @@ const AdvancedCompressImage = ({ toolId }) => {
                   onMouseDown={(e) => startDrag(e, 'move')}
                   className="absolute border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] cursor-move"
                 >
-                  {/* Grid Lines */}
                   {gridOverlay === 'thirds' && (
                     <div className="w-full h-full grid grid-cols-3 grid-rows-3 pointer-events-none border border-white/30">
                       {[...Array(9)].map((_, i) => (
@@ -482,7 +579,6 @@ const AdvancedCompressImage = ({ toolId }) => {
                     </div>
                   )}
 
-                  {/* Corner Handles */}
                   <div onMouseDown={(e) => startDrag(e, 'nw')} className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 bg-indigo-600 border border-white rounded-full cursor-nwse-resize" />
                   <div onMouseDown={(e) => startDrag(e, 'ne')} className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-indigo-600 border border-white rounded-full cursor-nesw-resize" />
                   <div onMouseDown={(e) => startDrag(e, 'sw')} className="absolute -bottom-1.5 -left-1.5 w-3.5 h-3.5 bg-indigo-600 border border-white rounded-full cursor-nesw-resize" />
@@ -490,7 +586,6 @@ const AdvancedCompressImage = ({ toolId }) => {
                 </div>
               </div>
 
-              {/* Continuous Angle Slider */}
               <div>
                 <div className="flex justify-between text-xs font-semibold text-gray-700 mb-1">
                   <span>Continuous Angle: {rotationAngle}°</span>
@@ -506,7 +601,6 @@ const AdvancedCompressImage = ({ toolId }) => {
                 />
               </div>
 
-              {/* Presets & Pixel Accuracy Display */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <label className="text-xs font-semibold text-gray-600">Aspect Ratio Presets</label>
@@ -532,7 +626,6 @@ const AdvancedCompressImage = ({ toolId }) => {
             </div>
           )}
 
-          {/* --- RESIZER TOOL UI --- */}
           {currentTool === 'resize-image' && (
             <div className="p-5 bg-gray-50 rounded-xl space-y-5">
               <div className="flex items-center justify-between">
@@ -606,7 +699,6 @@ const AdvancedCompressImage = ({ toolId }) => {
             </div>
           )}
 
-          {/* Export Settings & Format Conversion */}
           <div className="grid grid-cols-2 gap-3 bg-gray-50 p-4 rounded-xl">
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">Export Format</label>
@@ -651,7 +743,6 @@ const AdvancedCompressImage = ({ toolId }) => {
             {isProcessing ? 'Processing Images...' : `Process ${files.length} Image(s)`}
           </button>
 
-          {/* Download Links */}
           {batchResults.length > 0 && (
             <div className="space-y-2 pt-2">
               <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Processed Output</h4>
@@ -675,6 +766,103 @@ const AdvancedCompressImage = ({ toolId }) => {
           )}
         </>
       )}
+    </div>
+  );
+};
+
+const UniversalCalculator = ({ toolId }) => {
+  const [inputs, setInputs] = useState({});
+  const [result, setResult] = useState(null);
+
+  const handleInputChange = (field, val) => {
+    setInputs((prev) => ({ ...prev, [field]: val }));
+  };
+
+  const calculate = () => {
+    const val = (k) => Number(inputs[k]);
+    const numeric = (keys) => keys.every(k => inputs[k] !== undefined && inputs[k] !== '' && Number.isFinite(Number(inputs[k])));
+
+    switch (toolId) {
+      case 'percentage-calc': {
+        if (!numeric(['a', 'b'])) return;
+        const a = val('a'), b = val('b');
+        const mode = inputs.mode || 'X% of a number';
+        if (mode === 'What percent is X of Y') {
+          if (b === 0) return setResult({ error: 'Denominator cannot be zero.' });
+          const res = (a / b) * 100;
+          setResult({ output: `${fmt(res)}%`, note: `${fmt(a)} is this share of ${fmt(b)}.` });
+        } else {
+          const res = (a * b) / 100;
+          setResult({ output: fmt(res), note: `${fmt(res)} is ${fmt(a)}% of ${fmt(b)}.` });
+        }
+        break;
+      }
+      case 'age-calc': {
+        if (!inputs.birth || !inputs.on) return;
+        const b = new Date(`${inputs.birth}T12:00:00`), d = new Date(`${inputs.on}T12:00:00`);
+        if (Number.isNaN(+b) || d < b) return setResult({ error: 'Invalid date selection.' });
+        let y = d.getFullYear() - b.getFullYear(), m = d.getMonth() - b.getMonth(), day = d.getDate() - b.getDate();
+        if (day < 0) { m--; day += new Date(d.getFullYear(), d.getMonth(), 0).getDate(); }
+        if (m < 0) { y--; m += 12; }
+        setResult({ output: `${y} years, ${m} months, ${day} days`, note: 'Calculated from calendar dates.' });
+        break;
+      }
+      default:
+        setResult({ output: 'Calculator executed.' });
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-4">
+      <h3 className="font-bold text-gray-900 text-lg capitalize">{toolId.replace('-', ' ')}</h3>
+      <button onClick={calculate} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition">
+        Calculate Result
+      </button>
+      {result && (
+        <div className="p-4 bg-indigo-50 rounded-xl">
+          <p className="font-bold text-indigo-900">{result.output}</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const UniversalConverter = ({ toolId }) => {
+  const toolObj = TOOLS.find(t => t.id === toolId);
+  const rawSlug = toolObj?.rawSlug || toolId.replace('-conv', '');
+  const units = toolObj?.units || [];
+
+  const [val, setVal] = useState('1');
+  const [fromUnit, setFromUnit] = useState(units[0]?.[0] || '');
+  const [toUnit, setToUnit] = useState(units[1]?.[0] || units[0]?.[0] || '');
+
+  const result = convertUnits(rawSlug, val, fromUnit, toUnit);
+
+  return (
+    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-6">
+      <h3 className="font-bold text-gray-900 text-lg capitalize">{toolObj?.name || toolId.replace('-', ' ')}</h3>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Value</label>
+          <input type="number" value={val} onChange={(e) => setVal(e.target.value)} className="w-full border rounded-lg p-2.5 text-sm font-semibold" />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">From</label>
+          <select value={fromUnit} onChange={(e) => setFromUnit(e.target.value)} className="w-full border rounded-lg p-2.5 text-sm bg-white">
+            {units.map(([u]) => <option key={u} value={u}>{u}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">To</label>
+          <select value={toUnit} onChange={(e) => setToUnit(e.target.value)} className="w-full border rounded-lg p-2.5 text-sm bg-white">
+            {units.map(([u]) => <option key={u} value={u}>{u}</option>)}
+          </select>
+        </div>
+      </div>
+      <div className="p-6 bg-indigo-50 border border-indigo-100 rounded-xl text-center">
+        <span className="text-xs text-indigo-600 uppercase font-bold tracking-wider">Converted Output</span>
+        <p className="text-3xl font-extrabold text-indigo-900 mt-1">{result || '—'} <span className="text-lg font-medium">{toUnit}</span></p>
+      </div>
     </div>
   );
 };
@@ -723,6 +911,26 @@ export default function App() {
               />
             </div>
 
+            <div className="flex justify-center space-x-2 border-b border-slate-200 pb-4 overflow-x-auto">
+              {[
+                { id: 'all', label: 'All Tools' },
+                { id: 'image', label: 'Image Tools' },
+                { id: 'pdf', label: 'PDF Tools' },
+                { id: 'converters', label: 'Unit Converters' },
+                { id: 'calculators', label: 'Calculators' }
+              ].map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setActiveCategory(cat.id)}
+                  className={`px-4 py-2 rounded-xl text-sm font-bold transition ${
+                    activeCategory === cat.id ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredTools.map((tool) => (
                 <div
@@ -751,7 +959,13 @@ export default function App() {
               <span>Back to Tools</span>
             </button>
 
-            <AdvancedCompressImage toolId={activeToolId} />
+            {currentToolObj?.category === 'image' ? (
+              <AdvancedCompressImage toolId={activeToolId} />
+            ) : currentToolObj?.category === 'calculators' ? (
+              <UniversalCalculator toolId={activeToolId} />
+            ) : (
+              <UniversalConverter toolId={activeToolId} />
+            )}
           </div>
         )}
       </main>
