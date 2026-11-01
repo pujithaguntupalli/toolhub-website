@@ -553,7 +553,6 @@ const AdvancedCompressImage = ({ toolId }) => {
         const side = renderW;
 
         if (squareMode === 'crop') {
-          // Center 1:1 Crop with position offset slider
           const offsetFrac = squareOffset / 100;
           let sx = 0, sy = 0, sw = sourceW, sh = sourceH;
 
@@ -566,7 +565,6 @@ const AdvancedCompressImage = ({ toolId }) => {
           }
           ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, side, side);
         } else {
-          // Padding modes (White, Black, or Blur)
           if (squareMode === 'pad-white') {
             ctx.fillStyle = '#FFFFFF';
             ctx.fillRect(0, 0, side, side);
@@ -580,7 +578,6 @@ const AdvancedCompressImage = ({ toolId }) => {
             ctx.restore();
           }
 
-          // Draw un-cropped centered original inside padded frame
           const scale = side / Math.max(sourceW, sourceH);
           const drawW = Math.round(sourceW * scale);
           const drawH = Math.round(sourceH * scale);
@@ -589,7 +586,7 @@ const AdvancedCompressImage = ({ toolId }) => {
           ctx.drawImage(bitmap, 0, 0, sourceW, sourceH, dx, dy, drawW, drawH);
         }
       } 
-      // --- DEDICATED CIRCULAR CROP LOGIC (FIXED PANNING AXES) ---
+      // --- DEDICATED CIRCULAR CROP LOGIC (FIXED DUAL-AXIS UNLIMITED PANNING) ---
       else if (currentTool === 'circular-crop') {
         const circleDiam = renderW;
         ctx.clearRect(0, 0, circleDiam, circleDiam);
@@ -599,14 +596,17 @@ const AdvancedCompressImage = ({ toolId }) => {
         ctx.arc(circleDiam / 2, circleDiam / 2, circleDiam / 2, 0, Math.PI * 2);
         ctx.clip();
 
-        // Calculate available movement ranges independently along X and Y axes
-        const cropDim = Math.round(Math.min(sourceW, sourceH) * (circleScale / 100));
+        // Determine crop box size based on scale slider
+        const baseMin = Math.min(sourceW, sourceH);
+        const cropDim = Math.round(baseMin * (circleScale / 100));
 
-        const maxOffsetX = sourceW - cropDim;
-        const maxOffsetY = sourceH - cropDim;
+        // Calculate maximum shift allowance for both axes independently
+        const maxOffsetX = Math.max(0, sourceW - cropDim);
+        const maxOffsetY = Math.max(0, sourceH - cropDim);
 
-        const sx = Math.max(0, Math.min(maxOffsetX, Math.round(maxOffsetX * (circleCenterX / 100))));
-        const sy = Math.max(0, Math.min(maxOffsetY, Math.round(maxOffsetY * (circleCenterY / 100))));
+        // Calculate actual source X and Y top-left anchors
+        const sx = Math.round(maxOffsetX * (circleCenterX / 100));
+        const sy = Math.round(maxOffsetY * (circleCenterY / 100));
 
         ctx.drawImage(bitmap, sx, sy, cropDim, cropDim, 0, 0, circleDiam, circleDiam);
       } 
@@ -913,10 +913,10 @@ const AdvancedCompressImage = ({ toolId }) => {
                 </p>
               </div>
 
-              {/* Circular Live Preview with Axis Responsiveness */}
+              {/* Circular Live Preview */}
               <div className="w-full h-[320px] bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center p-4">
                 <div
-                  className="relative rounded-full overflow-hidden border-4 border-indigo-500 shadow-2xl flex items-center justify-center bg-slate-800"
+                  className="relative rounded-full overflow-hidden border-4 border-indigo-500 shadow-2xl bg-slate-800 flex items-center justify-center"
                   style={{
                     width: `${Math.min(260, 260 * (circleScale / 100))}px`,
                     height: `${Math.min(260, 260 * (circleScale / 100))}px`
@@ -926,14 +926,13 @@ const AdvancedCompressImage = ({ toolId }) => {
                     src={activeInfo.url}
                     alt="Circle Preview Target"
                     style={{
-                      width: activeInfo.width >= activeInfo.height ? 'auto' : '100%',
-                      height: activeInfo.height > activeInfo.width ? 'auto' : '100%',
-                      minWidth: '100%',
-                      minHeight: '100%',
                       objectFit: 'cover',
-                      objectPosition: `${circleCenterX}% ${circleCenterY}%`
+                      objectPosition: `${circleCenterX}% ${circleCenterY}%`,
+                      width: '100%',
+                      height: '100%',
+                      transform: `scale(${100 / Math.max(20, circleScale)})`
                     }}
-                    className="max-w-none"
+                    className="max-w-none transition-all duration-75"
                   />
                 </div>
               </div>
