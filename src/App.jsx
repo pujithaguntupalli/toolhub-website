@@ -345,18 +345,37 @@ const AdvancedCompressImage = ({ toolId }) => {
   };
 
   const applyPresetRatio = (ratio) => {
-    if (!origInfo.width) return;
+    if (!origInfo.width || !origInfo.height) return;
     setActiveRatio(ratio);
+
     if (ratio === '1:1') {
-      const min = Math.min(origInfo.width, origInfo.height);
-      setWidth(min); setHeight(min);
+      const minDim = Math.min(origInfo.width, origInfo.height);
+      setWidth(minDim);
+      setHeight(minDim);
     } else if (ratio === '16:9') {
-      setWidth(origInfo.width);
-      setHeight(Math.round(origInfo.width * (9 / 16)));
+      if (origInfo.width >= origInfo.height) {
+        setWidth(origInfo.width);
+        setHeight(Math.round((origInfo.width * 9) / 16));
+      } else {
+        setHeight(origInfo.height);
+        setWidth(Math.round((origInfo.height * 9) / 16));
+      }
     } else if (ratio === '4:3') {
-      setWidth(origInfo.width);
-      setHeight(Math.round(origInfo.width * (3 / 4)));
+      if (origInfo.width >= origInfo.height) {
+        const targetW = Math.round((origInfo.height * 4) / 3);
+        if (targetW <= origInfo.width) {
+          setWidth(targetW);
+          setHeight(origInfo.height);
+        } else {
+          setWidth(origInfo.width);
+          setHeight(Math.round((origInfo.width * 3) / 4));
+        }
+      } else {
+        setHeight(origInfo.height);
+        setWidth(Math.round((origInfo.height * 4) / 3));
+      }
     } else {
+      // 'Original'
       setWidth(origInfo.width);
       setHeight(origInfo.height);
     }
