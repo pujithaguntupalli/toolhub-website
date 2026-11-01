@@ -661,18 +661,17 @@ const AdvancedCompressImage = ({ toolId }) => {
           ctx.restore();
         }
       }
-      // --- 4. DEDICATED REMOVE METADATA ENGINE (CLEAN STRIP FIX) ---
+      // --- 4. DEDICATED REMOVE METADATA ENGINE (EXIF / GPS STRIP FIX) ---
       else if (currentTool === 'remove-metadata') {
-        // Complete clear of the canvas buffer to guarantee zero residual metadata inheritance
+        // Clear canvas buffer completely to erase any inherited metadata tracks
         ctx.clearRect(0, 0, renderW, renderH);
         
-        // Opaque white fill for JPEG outputs
         if (effectiveFormat === 'image/jpeg') {
           ctx.fillStyle = '#FFFFFF';
           ctx.fillRect(0, 0, renderW, renderH);
         }
 
-        // Clean-slate raw pixel draw (strips all EXIF, XMP, IPTC & GPS headers)
+        // Draw clean raw pixels directly into pristine canvas context
         ctx.drawImage(bitmap, 0, 0, renderW, renderH);
       }
       // --- OTHER TOOLS ---
