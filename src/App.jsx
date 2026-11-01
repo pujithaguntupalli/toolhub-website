@@ -446,7 +446,7 @@ const AdvancedCompressImage = ({ toolId }) => {
     };
 
     let finalFormat = outputFormat;
-    let blob = await generateBlob(outW, outH, finalFormat, quality / 100);
+    let blob;
 
     const targetValNum = Number(targetSizeVal);
     if (targetValNum > 0) {
@@ -455,24 +455,25 @@ const AdvancedCompressImage = ({ toolId }) => {
         finalFormat = 'image/jpeg';
       }
 
-      // Step 1: Quality Binary Search preserving EXACT requested dimensions
-      let minQ = 0.01, maxQ = 0.99;
-      let bestBlob = blob;
+      // Step 1: Search quality across FULL spectrum (0.05 to 0.98) to approach targetBytes
+      let minQ = 0.05, maxQ = 0.98;
+      let bestBlob = await generateBlob(outW, outH, finalFormat, 0.5);
 
       for (let i = 0; i < 12; i++) {
         const midQ = (minQ + maxQ) / 2;
         const testBlob = await generateBlob(outW, outH, finalFormat, midQ);
+
         if (testBlob.size <= targetBytes) {
           bestBlob = testBlob;
-          minQ = midQ;
+          minQ = midQ; // Push quality higher to land closer to target limit
         } else {
           maxQ = midQ;
         }
       }
       blob = bestBlob;
 
-      // Step 2: ONLY shrink dimensions if 1% quality STILL exceeds targetBytes AND no explicit width/height was set
-      const explicitDimensionSet = width > 0 || height > 0;
+      // Step 2: Scale dimensions ONLY if 5% quality is still above targetBytes and dimensions aren't explicitly locked
+      const explicitDimensionSet = width > 0 && height > 0 && (width !== origInfo.width || height !== origInfo.height);
       if (blob.size > targetBytes && !explicitDimensionSet) {
         let currentScale = 0.95;
         while (blob.size > targetBytes && currentScale > 0.1) {
@@ -484,6 +485,9 @@ const AdvancedCompressImage = ({ toolId }) => {
           currentScale -= 0.05;
         }
       }
+    } else {
+      // If target size is not specified, generate directly from slider quality setting
+      blob = await generateBlob(outW, outH, finalFormat, quality / 100);
     }
 
     bitmap.close();
