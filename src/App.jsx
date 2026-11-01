@@ -1,9 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { 
   Search, Calculator, ArrowRightLeft, FileText, Image as ImageIcon, 
   Download, Upload, Trash2, RotateCw, Sparkles, AlertCircle, ChevronRight,
   Layers, Lock, Unlock, ArrowLeft, Star, Clock, Percent, Volume2, Cpu,
-  Database, Flame, HardDrive, Compass, Thermometer, Box, Scale, Shield, Maximize2, Crop, CheckCircle2
+  Database, Flame, HardDrive, Compass, Thermometer, Box, Scale, Shield, Maximize2, Crop, CheckCircle2, Grid, ZoomIn, ZoomOut, RefreshCw
 } from 'lucide-react';
 
 // --- CONVERTER DATA & FORMULAS ---
@@ -75,8 +75,8 @@ function convertUnits(slug, amount, from, to) {
 // --- IMAGE TOOLS DEFINITION ---
 export const IMAGE_TOOLS = [
   { id: 'compress-image', name: 'Compress Image', description: 'Reduce image file size (KB/MB) while keeping pixel dimensions sharp.', keywords: ['compress', 'jpg', 'png', 'webp', 'reduce size', 'kb', 'mb'] },
-  { id: 'resize-image', name: 'Resize Image', description: 'Change overall image resolution (width & height in pixels) by scaling.', keywords: ['resize', 'dimensions', 'width', 'height', 'scale', 'pixels'] },
-  { id: 'crop-image', name: 'Crop Image', description: 'Trim and cut outer background edges from your image.', keywords: ['crop', 'trim', 'cut', 'aspect ratio'] },
+  { id: 'resize-image', name: 'Resize Image', description: 'Batch scale resolution with px/% controls, aspect ratio lock & live file size estimator.', keywords: ['resize', 'dimensions', 'width', 'height', 'scale', 'pixels', 'batch'] },
+  { id: 'crop-image', name: 'Crop Image', description: 'Interactive cropper with composition grids, zoom, continuous rotation & high-res rendering.', keywords: ['crop', 'trim', 'cut', 'aspect ratio', 'interactive', 'rotate'] },
   { id: 'rotate-image', name: 'Rotate Image', description: 'Rotate image by 90, 180, or 270 degrees.', keywords: ['rotate', 'turn', 'angle'] },
   { id: 'flip-image', name: 'Flip Image', description: 'Flip image horizontally or vertically.', keywords: ['flip', 'mirror'] },
   { id: 'jpg-to-png', name: 'JPG to PNG', description: 'Convert JPG images to PNG format.', keywords: ['jpg', 'png', 'convert'] },
@@ -253,326 +253,299 @@ const IconRenderer = ({ name, className = "w-5 h-5" }) => {
 };
 
 const AdvancedCompressImage = ({ toolId }) => {
-  const [file, setFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
-  const [origInfo, setOrigInfo] = useState({ width: 0, height: 0, size: 0, type: '' });
-  
-  // Resize Tool States
+  // Batch Upload File Management
+  const [files, setFiles] = useState([]);
+  const [activeFileIdx, setActiveFileIdx] = useState(0);
+  const [origInfos, setOrigInfos] = useState([]);
+
+  // --- RESIZER STATES ---
+  const [resizeMode, setResizeMode] = useState('px'); // 'px' or '%'
   const [width, setWidth] = useState(0);
   const [height, setHeight] = useState(0);
+  const [pctVal, setPctVal] = useState(100);
   const [keepAspectRatio, setKeepAspectRatio] = useState(true);
-  const [activeRatio, setActiveRatio] = useState('Original');
-
-  // Crop Tool Specific States (Independent Trimming Boundaries)
-  const [cropWidth, setCropWidth] = useState(0);
-  const [cropHeight, setCropHeight] = useState(0);
-  const [cropRatio, setCropRatio] = useState('Original');
-
-  const [percentage, setPercentage] = useState(100);
-  const [targetSizeVal, setTargetSizeVal] = useState('');
-  const [targetUnit, setTargetUnit] = useState('KB');
-  const [quality, setQuality] = useState(80);
+  const [quality, setQuality] = useState(85);
   const [outputFormat, setOutputFormat] = useState('image/jpeg');
-  const [rotation, setRotation] = useState(90);
-  const [flipMode, setFlipMode] = useState('horizontal');
+
+  // --- CROPPER STATES ---
+  const [cropRatioPreset, setCropRatioPreset] = useState('Freeform');
+  const [gridOverlay, setGridOverlay] = useState('thirds'); // 'none', 'thirds', 'golden'
+  const [rotationAngle, setRotationAngle] = useState(0); // -180 to 180 continuous degrees
+  const [flipHoriz, setFlipHoriz] = useState(false);
+  const [flipVert, setFlipVert] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [panPos, setPanPos] = useState({ x: 0, y: 0 });
+
+  // Interactive Bounding Box percentages [x, y, w, h] relative to container
+  const [cropBox, setCropBox] = useState({ x: 10, y: 10, w: 80, h: 80 });
+
+  // Additional Image Tool States
   const [blurRadius, setBlurRadius] = useState(4);
   const [watermarkText, setWatermarkText] = useState('');
-  
+
   const [isProcessing, setIsProcessing] = useState(false);
-  const [result, setResult] = useState(null);
+  const [batchResults, setBatchResults] = useState([]);
+
+  const containerRef = useRef(null);
+  const isDragging = useRef(false);
+  const dragType = useRef(null); // 'move', 'nw', 'ne', 'sw', 'se', 'pan'
+  const startMouse = useRef({ x: 0, y: 0 });
+  const startBox = useRef({ x: 0, y: 0, w: 0, h: 0 });
+  const startPan = useRef({ x: 0, y: 0 });
 
   const currentTool = toolId || 'compress-image';
+  const activeInfo = origInfos[activeFileIdx] || { width: 0, height: 0, size: 0, url: '' };
 
-  // Dynamic estimated size for dimension adjustments
+  // Live File Size Estimator
   const estimatedSizeBytes = useMemo(() => {
-    if (!origInfo.size || origInfo.width === 0 || origInfo.height === 0) return 0;
-
-    let currentW = width;
-    let currentH = height;
+    if (!activeInfo.size || activeInfo.width === 0 || activeInfo.height === 0) return 0;
+    let targetW = width;
+    let targetH = height;
 
     if (currentTool === 'crop-image') {
-      currentW = cropWidth;
-      currentH = cropHeight;
-    } else if (currentTool === 'resize-percentage') {
-      currentW = Math.round(origInfo.width * (percentage / 100));
-      currentH = Math.round(origInfo.height * (percentage / 100));
+      targetW = Math.round((activeInfo.width * cropBox.w) / 100);
+      targetH = Math.round((activeInfo.height * cropBox.h) / 100);
+    } else if (resizeMode === '%') {
+      targetW = Math.round(activeInfo.width * (pctVal / 100));
+      targetH = Math.round(activeInfo.height * (pctVal / 100));
     }
 
-    const areaRatio = (currentW * currentH) / (origInfo.width * origInfo.height);
-    const estimated = origInfo.size * areaRatio * (quality / 100);
+    const areaRatio = (targetW * targetH) / (activeInfo.width * activeInfo.height);
+    const estimated = activeInfo.size * areaRatio * (quality / 100);
     return Math.max(1024, Math.round(estimated));
-  }, [origInfo, width, height, cropWidth, cropHeight, percentage, quality, currentTool]);
+  }, [activeInfo, width, height, pctVal, cropBox, quality, currentTool, resizeMode]);
 
-  const handleFileChange = (e) => {
-    const selected = e.target.files[0];
-    if (!selected || !selected.type.startsWith('image/')) return;
+  const handleFilesChange = (e) => {
+    const selected = Array.from(e.target.files).filter((f) => f.type.startsWith('image/'));
+    if (selected.length === 0) return;
 
-    const img = new Image();
-    const url = URL.createObjectURL(selected);
-    img.onload = () => {
-      setFile(selected);
-      setPreviewUrl(url);
-      setOrigInfo({
-        width: img.naturalWidth,
-        height: img.naturalHeight,
-        size: selected.size,
-        type: selected.type
-      });
-      setWidth(img.naturalWidth);
-      setHeight(img.naturalHeight);
-      setCropWidth(img.naturalWidth);
-      setCropHeight(img.naturalHeight);
-      setActiveRatio('Original');
-      setCropRatio('Original');
-      setResult(null);
+    setFiles(selected);
+    setActiveFileIdx(0);
+    setBatchResults([]);
+    const loadedInfos = [];
 
-      if (currentTool === 'jpg-to-png') setOutputFormat('image/png');
-      else if (currentTool === 'png-to-jpg' || currentTool === 'webp-to-jpg') setOutputFormat('image/jpeg');
-      else if (currentTool === 'jpg-to-webp' || currentTool === 'png-to-webp') setOutputFormat('image/webp');
-      else if (currentTool === 'circular-crop') setOutputFormat('image/png');
-      else setOutputFormat(selected.type);
-    };
-    img.src = url;
+    selected.forEach((file, index) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        loadedInfos[index] = {
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+          size: file.size,
+          type: file.type,
+          url
+        };
+        if (index === 0) {
+          setWidth(img.naturalWidth);
+          setHeight(img.naturalHeight);
+          setCropBox({ x: 10, y: 10, w: 80, h: 80 });
+        }
+        if (loadedInfos.filter(Boolean).length === selected.length) {
+          setOrigInfos([...loadedInfos]);
+        }
+      };
+      img.src = url;
+    });
   };
 
-  // RESIZE TOOL HANDLERS (Scales complete image content)
-  const handleWidthChange = (val) => {
+  // Resizer Manual Pixel Controls
+  const handleWidthInput = (val) => {
     const w = Number(val);
     setWidth(w);
-    setActiveRatio(null);
-    if (keepAspectRatio && origInfo.width > 0 && w > 0) {
-      setHeight(Math.round(w * (origInfo.height / origInfo.width)));
+    if (keepAspectRatio && activeInfo.width > 0 && w > 0) {
+      setHeight(Math.round(w * (activeInfo.height / activeInfo.width)));
     }
   };
 
-  const handleHeightChange = (val) => {
+  const handleHeightInput = (val) => {
     const h = Number(val);
     setHeight(h);
-    setActiveRatio(null);
-    if (keepAspectRatio && origInfo.height > 0 && h > 0) {
-      setWidth(Math.round(h * (origInfo.width / origInfo.height)));
+    if (keepAspectRatio && activeInfo.height > 0 && h > 0) {
+      setWidth(Math.round(h * (activeInfo.width / activeInfo.height)));
     }
   };
 
-  const applyPresetRatio = (ratio) => {
-    if (!origInfo.width || !origInfo.height) return;
-    setActiveRatio(ratio);
+  // Resizer Preset Shortcuts
+  const applyPresetScaling = (percent) => {
+    setPctVal(percent);
+    if (!activeInfo.width || !activeInfo.height) return;
+    const scaledW = Math.round(activeInfo.width * (percent / 100));
+    const scaledH = Math.round(activeInfo.height * (percent / 100));
+    setWidth(scaledW);
+    setHeight(scaledH);
+  };
 
-    if (ratio === '1:1') {
-      const minDim = Math.min(origInfo.width, origInfo.height);
-      setWidth(minDim);
-      setHeight(minDim);
-    } else if (ratio === '16:9') {
-      if (origInfo.width >= origInfo.height) {
-        setWidth(origInfo.width);
-        setHeight(Math.round((origInfo.width * 9) / 16));
-      } else {
-        setHeight(origInfo.height);
-        setWidth(Math.round((origInfo.height * 16) / 9));
-      }
-    } else if (ratio === '4:3') {
-      if (origInfo.width >= origInfo.height) {
-        const targetW = Math.round((origInfo.height * 4) / 3);
-        if (targetW <= origInfo.width) {
-          setWidth(targetW);
-          setHeight(origInfo.height);
-        } else {
-          setWidth(origInfo.width);
-          setHeight(Math.round((origInfo.width * 3) / 4));
-        }
-      } else {
-        setWidth(Math.round((origInfo.height * 4) / 3));
-        setHeight(origInfo.height);
-      }
+  // Cropper Aspect Ratio Presets
+  const applyCropRatio = (preset) => {
+    setCropRatioPreset(preset);
+    if (preset === 'Freeform') return;
+
+    let targetRatio = 1;
+    if (preset === '1:1') targetRatio = 1;
+    else if (preset === '16:9') targetRatio = 16 / 9;
+    else if (preset === '9:16') targetRatio = 9 / 16;
+    else if (preset === '4:3') targetRatio = 4 / 3;
+    else if (preset === '4:5') targetRatio = 4 / 5;
+
+    const imgRatio = activeInfo.width / activeInfo.height;
+    let boxW = 80;
+    let boxH = (boxW * imgRatio) / targetRatio;
+
+    if (boxH > 90) {
+      boxH = 80;
+      boxW = (boxH * targetRatio) / imgRatio;
+    }
+
+    setCropBox({
+      x: Math.max(0, Math.round((100 - boxW) / 2)),
+      y: Math.max(0, Math.round((100 - boxH) / 2)),
+      w: Math.round(boxW),
+      h: Math.round(boxH)
+    });
+  };
+
+  // Dragging Handlers for Interactive Cropper Box
+  const startDrag = (e, type) => {
+    e.stopPropagation();
+    isDragging.current = true;
+    dragType.current = type;
+    startMouse.current = { x: e.clientX, y: e.clientY };
+    startBox.current = { ...cropBox };
+    startPan.current = { ...panPos };
+  };
+
+  const onMouseMove = (e) => {
+    if (!isDragging.current || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const dxPct = ((e.clientX - startMouse.current.x) / rect.width) * 100;
+    const dyPct = ((e.clientY - startMouse.current.y) / rect.height) * 100;
+
+    if (dragType.current === 'pan') {
+      setPanPos({
+        x: startPan.current.x + (e.clientX - startMouse.current.x),
+        y: startPan.current.y + (e.clientY - startMouse.current.y)
+      });
+      return;
+    }
+
+    let { x, y, w, h } = startBox.current;
+
+    if (dragType.current === 'move') {
+      x = Math.max(0, Math.min(100 - w, x + dxPct));
+      y = Math.max(0, Math.min(100 - h, y + dyPct));
     } else {
-      // 'Original' resets back to original image dimensions
-      setWidth(origInfo.width);
-      setHeight(origInfo.height);
+      if (dragType.current.includes('e')) w = Math.max(10, Math.min(100 - x, w + dxPct));
+      if (dragType.current.includes('s')) h = Math.max(10, Math.min(100 - y, h + dyPct));
+      if (dragType.current.includes('w')) {
+        const nw = Math.max(10, w - dxPct);
+        x = x + (w - nw);
+        w = nw;
+      }
+      if (dragType.current.includes('n')) {
+        const nh = Math.max(10, h - dyPct);
+        y = y + (h - nh);
+        h = nh;
+      }
     }
+    setCropBox({ x, y, w, h });
   };
 
-  // CROP TOOL HANDLERS (Trims outer edges inside image bounds)
-  const applyCropPresetRatio = (ratio) => {
-    if (!origInfo.width || !origInfo.height) return;
-    setCropRatio(ratio);
-
-    if (ratio === '1:1') {
-      const minDim = Math.min(origInfo.width, origInfo.height);
-      setCropWidth(minDim);
-      setCropHeight(minDim);
-    } else if (ratio === '16:9') {
-      const targetH = Math.round((origInfo.width * 9) / 16);
-      if (targetH <= origInfo.height) {
-        setCropWidth(origInfo.width);
-        setCropHeight(targetH); // Trims excess height off top & bottom
-      } else {
-        setCropWidth(Math.round((origInfo.height * 16) / 9)); // Trims excess width off sides
-        setCropHeight(origInfo.height);
-      }
-    } else if (ratio === '4:3') {
-      const targetW = Math.round((origInfo.height * 4) / 3);
-      if (targetW <= origInfo.width) {
-        setCropWidth(targetW);
-        setCropHeight(origInfo.height);
-      } else {
-        setCropWidth(origInfo.width);
-        setCropHeight(Math.round((origInfo.width * 3) / 4));
-      }
-    } else {
-      // 'Original' framing
-      setCropWidth(origInfo.width);
-      setCropHeight(origInfo.height);
-    }
+  const stopDrag = () => {
+    isDragging.current = false;
   };
 
-  const processImageTool = async () => {
-    if (!file || !previewUrl) return;
+  // High-Resolution Batch Processing Engine
+  const executeImageEngine = async () => {
+    if (files.length === 0) return;
     setIsProcessing(true);
+    const results = [];
 
-    const bitmap = await createImageBitmap(file);
-    const sourceWidth = bitmap.width;
-    const sourceHeight = bitmap.height;
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const bitmap = await createImageBitmap(file);
+      const sourceW = bitmap.width;
+      const sourceH = bitmap.height;
 
-    let outW = width || sourceWidth;
-    let outH = height || sourceHeight;
+      let renderW = width || sourceW;
+      let renderH = height || sourceH;
 
-    if (currentTool === 'crop-image') {
-      outW = Math.min(cropWidth, sourceWidth);
-      outH = Math.min(cropHeight, sourceHeight);
-    } else if (currentTool === 'resize-percentage') {
-      outW = Math.max(1, Math.round(sourceWidth * (percentage / 100)));
-      outH = Math.max(1, Math.round(sourceHeight * (percentage / 100)));
-    } else if (currentTool === 'make-square' || currentTool === 'circular-crop') {
-      outW = Math.min(sourceWidth, sourceHeight);
-      outH = outW;
-    } else if (currentTool === 'rotate-image' && (rotation === 90 || rotation === 270)) {
-      outW = sourceHeight;
-      outH = sourceWidth;
-    }
+      if (currentTool === 'crop-image') {
+        renderW = Math.round((sourceW * cropBox.w) / 100);
+        renderH = Math.round((sourceH * cropBox.h) / 100);
+      } else if (resizeMode === '%') {
+        renderW = Math.round(sourceW * (pctVal / 100));
+        renderH = Math.round(sourceH * (pctVal / 100));
+      } else if (currentTool === 'make-square' || currentTool === 'circular-crop') {
+        renderW = Math.min(sourceW, sourceH);
+        renderH = renderW;
+      }
 
-    const generateBlob = async (w, h, fmt, q) => {
       const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d', { alpha: fmt !== 'image/jpeg' });
+      canvas.width = renderW;
+      canvas.height = renderH;
+      const ctx = canvas.getContext('2d');
 
-      if (fmt === 'image/jpeg') {
+      if (outputFormat === 'image/jpeg') {
         ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, w, h);
+        ctx.fillRect(0, 0, renderW, renderH);
       }
 
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
 
       if (currentTool === 'crop-image') {
-        // CROP LOGIC: Calculate center offsets and cut off excess edge pixels
-        const sx = Math.max(0, Math.floor((sourceWidth - w) / 2));
-        const sy = Math.max(0, Math.floor((sourceHeight - h) / 2));
-        ctx.drawImage(bitmap, sx, sy, w, h, 0, 0, w, h);
-      } else if (currentTool === 'rotate-image') {
+        const cropX = Math.round((sourceW * cropBox.x) / 100);
+        const cropY = Math.round((sourceH * cropBox.y) / 100);
+        const cropW = Math.round((sourceW * cropBox.w) / 100);
+        const cropH = Math.round((sourceH * cropBox.h) / 100);
+
         ctx.save();
-        ctx.translate(w / 2, h / 2);
-        ctx.rotate((rotation * Math.PI) / 180);
-        ctx.drawImage(bitmap, -sourceWidth / 2, -sourceHeight / 2);
-        ctx.restore();
-      } else if (currentTool === 'flip-image') {
-        ctx.save();
-        ctx.translate(flipMode === 'horizontal' ? w : 0, flipMode === 'vertical' ? h : 0);
-        ctx.scale(flipMode === 'horizontal' ? -1 : 1, flipMode === 'vertical' ? -1 : 1);
-        ctx.drawImage(bitmap, 0, 0, w, h);
+        ctx.translate(renderW / 2, renderH / 2);
+        ctx.rotate((rotationAngle * Math.PI) / 180);
+        ctx.scale(flipHoriz ? -1 : 1, flipVert ? -1 : 1);
+        ctx.drawImage(bitmap, cropX, cropY, cropW, cropH, -renderW / 2, -renderH / 2, renderW, renderH);
         ctx.restore();
       } else if (currentTool === 'circular-crop') {
         ctx.beginPath();
-        ctx.arc(w / 2, h / 2, w / 2, 0, Math.PI * 2);
+        ctx.arc(renderW / 2, renderH / 2, renderW / 2, 0, Math.PI * 2);
         ctx.clip();
-        const sx = Math.floor((sourceWidth - w) / 2);
-        const sy = Math.floor((sourceHeight - h) / 2);
-        ctx.drawImage(bitmap, sx, sy, w, h, 0, 0, w, h);
+        const sx = Math.floor((sourceW - renderW) / 2);
+        const sy = Math.floor((sourceH - renderH) / 2);
+        ctx.drawImage(bitmap, sx, sy, renderW, renderH, 0, 0, renderW, renderH);
       } else {
-        // RESIZE / NORMAL LOGIC: Take 100% of image content and scale into canvas (w x h)
         if (currentTool === 'grayscale-image') ctx.filter = 'grayscale(1)';
         if (currentTool === 'blur-image') ctx.filter = `blur(${blurRadius}px)`;
 
-        let sx = 0, sy = 0, sw = sourceWidth, sh = sourceHeight;
-        if (currentTool === 'make-square') {
-          sw = w; sh = h;
-          sx = Math.floor((sourceWidth - sw) / 2);
-          sy = Math.floor((sourceHeight - sh) / 2);
-        }
-
-        ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, w, h);
+        ctx.drawImage(bitmap, 0, 0, sourceW, sourceH, 0, 0, renderW, renderH);
         ctx.filter = 'none';
       }
 
       if (currentTool === 'add-text-image' && watermarkText) {
-        const fontSize = Math.max(16, Math.round(w / 18));
+        const fontSize = Math.max(16, Math.round(renderW / 18));
         ctx.font = `600 ${fontSize}px system-ui, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
         ctx.strokeStyle = 'rgba(0,0,0,0.7)';
         ctx.lineWidth = 3;
         ctx.fillStyle = '#ffffff';
-        ctx.strokeText(watermarkText, w / 2, h - fontSize * 0.7);
-        ctx.fillText(watermarkText, w / 2, h - fontSize * 0.7);
+        ctx.strokeText(watermarkText, renderW / 2, renderH - fontSize * 0.7);
+        ctx.fillText(watermarkText, renderW / 2, renderH - fontSize * 0.7);
       }
 
-      return new Promise((res) => canvas.toBlob(res, fmt, q));
-    };
+      const blob = await new Promise((res) => canvas.toBlob(res, outputFormat, quality / 100));
+      bitmap.close();
 
-    let finalFormat = outputFormat;
-    let blob;
-
-    const targetValNum = Number(targetSizeVal);
-    if (targetValNum > 0) {
-      const targetBytes = targetUnit === 'MB' ? targetValNum * 1024 * 1024 : targetValNum * 1024;
-      if (finalFormat === 'image/png') {
-        finalFormat = 'image/jpeg';
-      }
-
-      let minQ = 0.05, maxQ = 0.98;
-      let bestBlob = await generateBlob(outW, outH, finalFormat, 0.5);
-
-      for (let i = 0; i < 12; i++) {
-        const midQ = (minQ + maxQ) / 2;
-        const testBlob = await generateBlob(outW, outH, finalFormat, midQ);
-
-        if (testBlob.size <= targetBytes) {
-          bestBlob = testBlob;
-          minQ = midQ;
-        } else {
-          maxQ = midQ;
-        }
-      }
-      blob = bestBlob;
-
-      const explicitDimensionSet = width > 0 && height > 0 && (width !== origInfo.width || height !== origInfo.height);
-      if (blob.size > targetBytes && !explicitDimensionSet) {
-        let currentScale = 0.95;
-        while (blob.size > targetBytes && currentScale > 0.1) {
-          const scaledW = Math.max(16, Math.round(outW * currentScale));
-          const scaledH = Math.max(16, Math.round(outH * currentScale));
-          blob = await generateBlob(scaledW, scaledH, finalFormat, 0.5);
-          outW = scaledW;
-          outH = scaledH;
-          currentScale -= 0.05;
-        }
-      }
-    } else {
-      blob = await generateBlob(outW, outH, finalFormat, quality / 100);
+      const ext = outputFormat === 'image/jpeg' ? 'jpg' : outputFormat.split('/')[1];
+      results.push({
+        url: URL.createObjectURL(blob),
+        fileName: `${currentTool}_${file.name.split('.')[0]}.${ext}`,
+        width: renderW,
+        height: renderH,
+        size: blob.size
+      });
     }
 
-    bitmap.close();
-    const url = URL.createObjectURL(blob);
-    const ext = finalFormat === 'image/jpeg' ? 'jpg' : finalFormat.split('/')[1];
-
-    setResult({
-      url,
-      width: outW,
-      height: outH,
-      size: blob.size,
-      reduction: (((origInfo.size - blob.size) / origInfo.size) * 100).toFixed(1),
-      fileName: `${currentTool}_${file.name.split('.')[0]}.${ext}`
-    });
+    setBatchResults(results);
     setIsProcessing(false);
   };
 
@@ -583,176 +556,204 @@ const AdvancedCompressImage = ({ toolId }) => {
           Active Tool: {currentTool.replace(/-/g, ' ')}
         </h3>
         <p className="text-xs text-indigo-700 mt-0.5">
-          {currentTool === 'compress-image' 
-            ? 'Reduce file size (KB/MB) while keeping pixel dimensions sharp.' 
-            : currentTool === 'resize-image'
-            ? 'Change resolution by scaling total pixel dimensions.'
+          {currentTool === 'resize-image' || ['change-dimensions', 'resize-pixels', 'resize-percentage'].includes(currentTool)
+            ? 'Batch scale dimensions via manual px inputs, percentage shortcuts, aspect ratio locking & real-time file size estimation.'
             : currentTool === 'crop-image'
-            ? 'Trim away outer edges using custom boundary framing or aspect ratio presets.'
-            : 'Process and adjust image properties client-side.'}
+            ? 'Interactive cropper featuring Rule-of-Thirds & Golden Ratio overlays, zoom, pan controls, continuous rotation & high-resolution rendering.'
+            : 'Client-side image processing suite.'}
         </p>
       </div>
 
       <div>
-        <label className="flex flex-col items-center justify-center w-full h-36 border-2 border-dashed border-indigo-200 rounded-xl cursor-pointer bg-indigo-50/30 hover:bg-indigo-50 transition">
-          <Upload className="w-8 h-8 text-indigo-500 mb-1" />
-          <span className="text-sm font-medium text-gray-700">Select Image (JPG, PNG, WEBP)</span>
-          <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-indigo-200 rounded-xl cursor-pointer bg-indigo-50/30 hover:bg-indigo-50 transition">
+          <Upload className="w-7 h-7 text-indigo-500 mb-1" />
+          <span className="text-sm font-medium text-gray-700">Select Images (Batch Upload Supported)</span>
+          <input type="file" accept="image/*" multiple onChange={handleFilesChange} className="hidden" />
         </label>
       </div>
 
-      {file && (
+      {files.length > 0 && activeInfo && (
         <>
-          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-              <div>
-                <p className="text-sm font-bold text-emerald-900">Image Uploaded Successfully</p>
-                <p className="text-xs text-emerald-700">{file.name} ({origInfo.width}x{origInfo.height}px)</p>
-              </div>
+          {files.length > 1 && (
+            <div className="flex space-x-2 overflow-x-auto pb-2">
+              {files.map((f, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setActiveFileIdx(idx)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                    activeFileIdx === idx
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {f.name}
+                </button>
+              ))}
             </div>
-            <div className="text-right">
-              <span className="text-xs font-semibold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-lg">
-                Original Size: {formatBytes(origInfo.size)} ({origInfo.size.toLocaleString()} Bytes)
-              </span>
-            </div>
-          </div>
+          )}
 
-          <div className="p-5 bg-gray-50 rounded-xl space-y-5">
-            {/* --- CROP IMAGE DEDICATED CONTROLS --- */}
-            {currentTool === 'crop-image' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-gray-700">Crop Area Boundaries (Trims Edges)</span>
-                  <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
-                    Target Crop: {cropWidth} × {cropHeight} px
+          {/* --- CROPPER TOOL INTERACTIVE CANVAS & CONTROLS --- */}
+          {currentTool === 'crop-image' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between bg-gray-100 p-2.5 rounded-xl text-xs font-semibold">
+                <div className="flex items-center space-x-2">
+                  <button onClick={() => setZoomLevel((z) => Math.min(3, z + 0.2))} className="p-1.5 bg-white rounded border hover:bg-gray-50"><ZoomIn className="w-4 h-4" /></button>
+                  <button onClick={() => setZoomLevel((z) => Math.max(0.5, z - 0.2))} className="p-1.5 bg-white rounded border hover:bg-gray-50"><ZoomOut className="w-4 h-4" /></button>
+                  <button onClick={() => { setZoomLevel(1); setPanPos({ x: 0, y: 0 }); }} className="p-1.5 bg-white rounded border hover:bg-gray-50"><RefreshCw className="w-4 h-4" /></button>
+                  <span className="text-gray-500">Zoom: {Math.round(zoomLevel * 100)}%</span>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <button onClick={() => setFlipHoriz(!flipHoriz)} className={`px-2 py-1 rounded border ${flipHoriz ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700'}`}>Flip H</button>
+                  <button onClick={() => setFlipVert(!flipVert)} className={`px-2 py-1 rounded border ${flipVert ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700'}`}>Flip V</button>
+                  <select value={gridOverlay} onChange={(e) => setGridOverlay(e.target.value)} className="bg-white border rounded px-2 py-1 text-xs font-semibold">
+                    <option value="none">No Grid</option>
+                    <option value="thirds">Rule of Thirds</option>
+                    <option value="golden">Golden Ratio</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Interactive View Container */}
+              <div
+                ref={containerRef}
+                onMouseDown={(e) => startDrag(e, 'pan')}
+                onMouseMove={onMouseMove}
+                onMouseUp={stopDrag}
+                onMouseLeave={stopDrag}
+                className="relative w-full h-[380px] bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing select-none"
+              >
+                <img
+                  src={activeInfo.url}
+                  alt="Crop Target"
+                  style={{
+                    transform: `translate(${panPos.x}px, ${panPos.y}px) scale(${zoomLevel}) rotate(${rotationAngle}deg) scale(${flipHoriz ? -1 : 1}, ${flipVert ? -1 : 1})`,
+                    maxHeight: '100%',
+                    maxWidth: '100%',
+                    objectFit: 'contain'
+                  }}
+                  className="pointer-events-none transition-transform duration-75"
+                />
+
+                {/* Bounding Box Overlay */}
+                <div
+                  style={{
+                    left: `${cropBox.x}%`,
+                    top: `${cropBox.y}%`,
+                    width: `${cropBox.w}%`,
+                    height: `${cropBox.h}%`
+                  }}
+                  onMouseDown={(e) => startDrag(e, 'move')}
+                  className="absolute border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] cursor-move"
+                >
+                  {/* Grid Lines */}
+                  {gridOverlay === 'thirds' && (
+                    <div className="w-full h-full grid grid-cols-3 grid-rows-3 pointer-events-none border border-white/30">
+                      {[...Array(9)].map((_, i) => (
+                        <div key={i} className="border border-white/20" />
+                      ))}
+                    </div>
+                  )}
+
+                  {gridOverlay === 'golden' && (
+                    <div className="w-full h-full relative pointer-events-none border border-white/30">
+                      <div className="absolute left-[38.2%] top-0 bottom-0 border-r border-white/30" />
+                      <div className="absolute right-[38.2%] top-0 bottom-0 border-r border-white/30" />
+                      <div className="absolute top-[38.2%] left-0 right-0 border-b border-white/30" />
+                      <div className="absolute bottom-[38.2%] left-0 right-0 border-b border-white/30" />
+                    </div>
+                  )}
+
+                  {/* Corner Handles */}
+                  <div onMouseDown={(e) => startDrag(e, 'nw')} className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 bg-indigo-600 border border-white rounded-full cursor-nwse-resize" />
+                  <div onMouseDown={(e) => startDrag(e, 'ne')} className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-indigo-600 border border-white rounded-full cursor-nesw-resize" />
+                  <div onMouseDown={(e) => startDrag(e, 'sw')} className="absolute -bottom-1.5 -left-1.5 w-3.5 h-3.5 bg-indigo-600 border border-white rounded-full cursor-nesw-resize" />
+                  <div onMouseDown={(e) => startDrag(e, 'se')} className="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 bg-indigo-600 border border-white rounded-full cursor-nwse-resize" />
+                </div>
+              </div>
+
+              {/* Continuous Angle Slider */}
+              <div>
+                <div className="flex justify-between text-xs font-semibold text-gray-700 mb-1">
+                  <span>Continuous Angle: {rotationAngle}°</span>
+                  <button onClick={() => setRotationAngle(0)} className="text-indigo-600 hover:underline">Reset Angle</button>
+                </div>
+                <input
+                  type="range"
+                  min="-180"
+                  max="180"
+                  value={rotationAngle}
+                  onChange={(e) => setRotationAngle(Number(e.target.value))}
+                  className="w-full accent-indigo-600"
+                />
+              </div>
+
+              {/* Presets & Pixel Accuracy Display */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-semibold text-gray-600">Aspect Ratio Presets</label>
+                  <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                    Selection: {Math.round((activeInfo.width * cropBox.w) / 100)} × {Math.round((activeInfo.height * cropBox.h) / 100)} px
                   </span>
                 </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">Crop Width (px)</label>
-                    <input
-                      type="number"
-                      max={origInfo.width}
-                      value={cropWidth}
-                      onChange={(e) => {
-                        setCropWidth(Number(e.target.value));
-                        setCropRatio(null);
-                      }}
-                      className="w-full border rounded-lg p-2 text-sm bg-white font-semibold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">Crop Height (px)</label>
-                    <input
-                      type="number"
-                      max={origInfo.height}
-                      value={cropHeight}
-                      onChange={(e) => {
-                        setCropHeight(Number(e.target.value));
-                        setCropRatio(null);
-                      }}
-                      className="w-full border rounded-lg p-2 text-sm bg-white font-semibold"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Crop Aspect Ratio Presets</label>
-                  <div className="flex space-x-2">
-                    {['Original', '16:9', '4:3', '1:1'].map((r) => {
-                      const isActive = cropRatio === r;
-                      return (
-                        <button
-                          key={r}
-                          type="button"
-                          onClick={() => applyCropPresetRatio(r)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                            isActive
-                              ? 'bg-indigo-600 text-white shadow-sm border border-indigo-600'
-                              : 'bg-white border border-gray-200 text-gray-700 hover:border-indigo-400 hover:text-indigo-600'
-                          }`}
-                        >
-                          {r}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* --- COMPRESS IMAGE CONTROLS --- */}
-            {currentTool === 'compress-image' && (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Target File Size Limit (KB / MB)</label>
-                  <div className="grid grid-cols-3 gap-3">
-                    <input
-                      type="number"
-                      placeholder={`Target Limit (e.g. ${targetUnit === 'KB' ? '50' : '2'})`}
-                      value={targetSizeVal}
-                      onChange={(e) => setTargetSizeVal(e.target.value)}
-                      className="col-span-2 border rounded-lg p-2.5 text-sm bg-white"
-                    />
-                    <select
-                      value={targetUnit}
-                      onChange={(e) => setTargetUnit(e.target.value)}
-                      className="border rounded-lg p-2.5 text-sm bg-white font-semibold"
-                    >
-                      <option value="KB">KB (Kilobytes)</option>
-                      <option value="MB">MB (Megabytes)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-xs font-semibold text-gray-700 mb-1">
-                    <span>Compression Quality ({quality}%)</span>
-                    <span className="text-indigo-600">Resolution stays at {origInfo.width}x{origInfo.height}px</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="10"
-                    max="100"
-                    value={quality}
-                    onChange={(e) => setQuality(Number(e.target.value))}
-                    className="w-full accent-indigo-600"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* --- RESIZE IMAGE CONTROLS --- */}
-            {['resize-image', 'change-dimensions', 'resize-pixels'].includes(currentTool) && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs font-semibold text-gray-700">Dimensions (Scales Image)</span>
+                <div className="flex space-x-2">
+                  {['Freeform', '1:1', '16:9', '9:16', '4:3', '4:5'].map((r) => (
                     <button
+                      key={r}
                       type="button"
-                      onClick={() => setKeepAspectRatio(!keepAspectRatio)}
-                      className={`px-2 py-0.5 rounded text-xs flex items-center space-x-1 ${
-                        keepAspectRatio ? 'bg-indigo-100 text-indigo-700 font-bold' : 'bg-gray-200 text-gray-600'
+                      onClick={() => applyCropRatio(r)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                        cropRatioPreset === r ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
-                      {keepAspectRatio ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
-                      <span>{keepAspectRatio ? 'Aspect Ratio Locked' : 'Unlocked'}</span>
+                      {r}
                     </button>
-                  </div>
-                  <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
-                    Est. Output Size: ~{formatBytes(estimatedSizeBytes)}
-                  </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* --- RESIZER TOOL CONTROLS --- */}
+          {['resize-image', 'change-dimensions', 'resize-pixels', 'resize-percentage'].includes(currentTool) && (
+            <div className="p-5 bg-gray-50 rounded-xl space-y-5">
+              <div className="flex items-center justify-between">
+                <div className="flex space-x-2 bg-gray-200 p-1 rounded-lg text-xs font-bold">
+                  <button
+                    onClick={() => setResizeMode('px')}
+                    className={`px-3 py-1 rounded-md transition ${resizeMode === 'px' ? 'bg-white shadow text-indigo-600' : 'text-gray-600'}`}
+                  >
+                    Pixels (px)
+                  </button>
+                  <button
+                    onClick={() => setResizeMode('%')}
+                    className={`px-3 py-1 rounded-md transition ${resizeMode === '%' ? 'bg-white shadow text-indigo-600' : 'text-gray-600'}`}
+                  >
+                    Percentage (%)
+                  </button>
                 </div>
 
+                <button
+                  type="button"
+                  onClick={() => setKeepAspectRatio(!keepAspectRatio)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 ${
+                    keepAspectRatio ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-200 text-gray-600'
+                  }`}
+                >
+                  {keepAspectRatio ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                  <span>{keepAspectRatio ? 'Aspect Ratio Locked' : 'Ratio Unlocked'}</span>
+                </button>
+              </div>
+
+              {resizeMode === 'px' ? (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 mb-1">Width (px)</label>
                     <input
                       type="number"
                       value={width}
-                      onChange={(e) => handleWidthChange(e.target.value)}
+                      onChange={(e) => handleWidthInput(e.target.value)}
                       className="w-full border rounded-lg p-2 text-sm bg-white font-semibold"
                     />
                   </div>
@@ -761,144 +762,98 @@ const AdvancedCompressImage = ({ toolId }) => {
                     <input
                       type="number"
                       value={height}
-                      onChange={(e) => handleHeightChange(e.target.value)}
+                      onChange={(e) => handleHeightInput(e.target.value)}
                       className="w-full border rounded-lg p-2 text-sm bg-white font-semibold"
                     />
                   </div>
                 </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Aspect Ratio Presets</label>
+              ) : (
+                <div className="space-y-2">
+                  <label className="block text-xs font-semibold text-gray-500">Preset Scaling Shortcuts</label>
                   <div className="flex space-x-2">
-                    {['Original', '16:9', '4:3', '1:1'].map((r) => {
-                      const isActive = activeRatio === r;
-                      return (
-                        <button
-                          key={r}
-                          type="button"
-                          onClick={() => applyPresetRatio(r)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                            isActive
-                              ? 'bg-indigo-600 text-white shadow-sm border border-indigo-600'
-                              : 'bg-white border border-gray-200 text-gray-700 hover:border-indigo-400 hover:text-indigo-600'
-                          }`}
-                        >
-                          {r}
-                        </button>
-                      );
-                    })}
+                    {[25, 50, 75, 100].map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => applyPresetScaling(p)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                          pctVal === p ? 'bg-indigo-600 text-white' : 'bg-white border text-gray-700 hover:border-indigo-400'
+                        }`}
+                      >
+                        {p}%
+                      </button>
+                    ))}
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+          )}
 
-            {currentTool === 'resize-percentage' && (
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-xs font-semibold text-gray-600">Scale Percentage (%)</label>
-                  <span className="text-xs text-indigo-600 font-bold">Est. Output Size: ~{formatBytes(estimatedSizeBytes)}</span>
-                </div>
-                <input
-                  type="number"
-                  value={percentage}
-                  onChange={(e) => setPercentage(Number(e.target.value))}
-                  className="w-full border rounded-lg p-2 text-sm bg-white"
-                />
-              </div>
-            )}
-
-            {currentTool === 'rotate-image' && (
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Rotate Angle</label>
-                <select
-                  value={rotation}
-                  onChange={(e) => setRotation(Number(e.target.value))}
-                  className="w-full border rounded-lg p-2 text-sm bg-white"
-                >
-                  <option value={90}>90° Clockwise</option>
-                  <option value={180}>180° Turn</option>
-                  <option value={270}>270° Counter-Clockwise</option>
-                </select>
-              </div>
-            )}
-
-            {currentTool === 'flip-image' && (
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Flip Direction</label>
-                <select
-                  value={flipMode}
-                  onChange={(e) => setFlipMode(e.target.value)}
-                  className="w-full border rounded-lg p-2 text-sm bg-white"
-                >
-                  <option value="horizontal">Horizontal (Mirror)</option>
-                  <option value="vertical">Vertical</option>
-                </select>
-              </div>
-            )}
-
-            {currentTool === 'blur-image' && (
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Blur Amount: {blurRadius}px</label>
-                <input
-                  type="range"
-                  min="1"
-                  max="40"
-                  value={blurRadius}
-                  onChange={(e) => setBlurRadius(Number(e.target.value))}
-                  className="w-full accent-indigo-600"
-                />
-              </div>
-            )}
-
-            {currentTool === 'add-text-image' && (
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Watermark Text</label>
-                <input
-                  type="text"
-                  placeholder="Enter text overlay..."
-                  value={watermarkText}
-                  onChange={(e) => setWatermarkText(e.target.value)}
-                  className="w-full border rounded-lg p-2 text-sm bg-white"
-                />
-              </div>
-            )}
-
+          {/* Export Settings & Format Conversion */}
+          <div className="grid grid-cols-2 gap-3 bg-gray-50 p-4 rounded-xl">
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Output Format</label>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Export Format</label>
               <select
                 value={outputFormat}
                 onChange={(e) => setOutputFormat(e.target.value)}
-                className="w-full border rounded-lg p-2 text-sm bg-white"
+                className="w-full border rounded-lg p-2 text-sm bg-white font-semibold"
               >
                 <option value="image/jpeg">JPEG (.jpg)</option>
                 <option value="image/png">PNG (.png)</option>
                 <option value="image/webp">WEBP (.webp)</option>
               </select>
             </div>
+
+            <div>
+              <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
+                <span>Compression Quality ({quality}%)</span>
+              </div>
+              <input
+                type="range"
+                min="1"
+                max="100"
+                value={quality}
+                onChange={(e) => setQuality(Number(e.target.value))}
+                className="w-full accent-indigo-600"
+              />
+            </div>
+          </div>
+
+          <div className="p-3 bg-indigo-50/60 border border-indigo-100 rounded-xl flex items-center justify-between text-xs font-semibold text-indigo-900">
+            <span>Estimated Output File Size:</span>
+            <span className="text-indigo-700 font-bold bg-white px-2.5 py-1 rounded border border-indigo-200">
+              ~{formatBytes(estimatedSizeBytes)}
+            </span>
           </div>
 
           <button
-            onClick={processImageTool}
+            onClick={executeImageEngine}
             disabled={isProcessing}
             className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition"
           >
-            {isProcessing ? 'Processing Image...' : 'Process Image'}
+            {isProcessing ? 'Processing Images...' : `Process ${files.length} Image(s)`}
           </button>
 
-          {result && (
-            <div className="p-4 border border-indigo-100 rounded-xl bg-indigo-50/50 space-y-3">
-              <div className="flex items-center justify-between text-xs text-gray-700">
-                <span>Dimensions: <strong>{result.width}x{result.height}px</strong></span>
-                <span>Output Size: <strong>{formatBytes(result.size)}</strong> ({result.size.toLocaleString()} Bytes)</span>
-              </div>
-              <a
-                href={result.url}
-                download={result.fileName}
-                className="flex items-center justify-center space-x-2 w-full py-2.5 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition text-sm"
-              >
-                <Download className="w-4 h-4" />
-                <span>Download Result</span>
-              </a>
+          {/* Download Links */}
+          {batchResults.length > 0 && (
+            <div className="space-y-2 pt-2">
+              <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Processed Output</h4>
+              {batchResults.map((res, idx) => (
+                <div key={idx} className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-emerald-900">{res.fileName}</p>
+                    <p className="text-xs text-emerald-700">{res.width} × {res.height} px — {formatBytes(res.size)}</p>
+                  </div>
+                  <a
+                    href={res.url}
+                    download={res.fileName}
+                    className="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download</span>
+                  </a>
+                </div>
+              ))}
             </div>
           )}
         </>
