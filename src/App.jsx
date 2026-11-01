@@ -368,10 +368,7 @@ const AdvancedCompressImage = ({ toolId }) => {
     let outW = width || sourceWidth;
     let outH = height || sourceHeight;
 
-    if (currentTool === 'compress-image') {
-      outW = sourceWidth;
-      outH = sourceHeight;
-    } else if (currentTool === 'resize-percentage') {
+    if (currentTool === 'resize-percentage') {
       outW = Math.max(1, Math.round(sourceWidth * (percentage / 100)));
       outH = Math.max(1, Math.round(sourceHeight * (percentage / 100)));
     } else if (currentTool === 'make-square' || currentTool === 'circular-crop') {
@@ -458,10 +455,11 @@ const AdvancedCompressImage = ({ toolId }) => {
         finalFormat = 'image/jpeg';
       }
 
-      let minQ = 0.05, maxQ = 0.98;
+      // Step 1: Quality Binary Search preserving EXACT requested dimensions
+      let minQ = 0.01, maxQ = 0.99;
       let bestBlob = blob;
 
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 12; i++) {
         const midQ = (minQ + maxQ) / 2;
         const testBlob = await generateBlob(outW, outH, finalFormat, midQ);
         if (testBlob.size <= targetBytes) {
@@ -473,12 +471,14 @@ const AdvancedCompressImage = ({ toolId }) => {
       }
       blob = bestBlob;
 
-      if (blob.size > targetBytes) {
+      // Step 2: ONLY shrink dimensions if 1% quality STILL exceeds targetBytes AND no explicit width/height was set
+      const explicitDimensionSet = width > 0 || height > 0;
+      if (blob.size > targetBytes && !explicitDimensionSet) {
         let currentScale = 0.95;
         while (blob.size > targetBytes && currentScale > 0.1) {
           const scaledW = Math.max(16, Math.round(outW * currentScale));
           const scaledH = Math.max(16, Math.round(outH * currentScale));
-          blob = await generateBlob(scaledW, scaledH, finalFormat, 0.7);
+          blob = await generateBlob(scaledW, scaledH, finalFormat, 0.5);
           outW = scaledW;
           outH = scaledH;
           currentScale -= 0.05;
@@ -509,7 +509,7 @@ const AdvancedCompressImage = ({ toolId }) => {
         </h3>
         <p className="text-xs text-indigo-700 mt-0.5">
           {currentTool === 'compress-image' 
-            ? 'Reduce file size (KB/MB) while keeping full resolution intact.' 
+            ? 'Reduce file size (KB/MB) while keeping pixel dimensions sharp.' 
             : currentTool === 'resize-image'
             ? 'Adjust width and height in pixels while locking aspect ratio.'
             : 'Process and adjust image properties client-side.'}
