@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   Search, Calculator, ArrowRightLeft, FileText, Image as ImageIcon, 
   Download, Upload, Trash2, RotateCw, Sparkles, AlertCircle, ChevronRight,
@@ -257,23 +257,32 @@ const AdvancedCompressImage = ({ toolId }) => {
   const [targetFormat, setTargetFormat] = useState('image/png');
 
   // --- RESIZER STATES ---
-  const [resizeMode, setResizeMode] = useState('px'); // 'px' or '%'
+  const [resizeMode, setResizeMode] = useState(toolId === 'resize-percentage' ? '%' : 'px'); // 'px' or '%'
   const [width, setWidth] = useState(0);
   const [height, setHeight] = useState(0);
-  const [pctVal, setPctVal] = useState(100);
+  const [pctVal, setPctVal] = useState(50);
   const [keepAspectRatio, setKeepAspectRatio] = useState(true);
   const [quality, setQuality] = useState(85);
   const [outputFormat, setOutputFormat] = useState('image/jpeg');
 
+  // Sync default mode on mount or tool change
+  useEffect(() => {
+    if (toolId === 'resize-percentage') {
+      setResizeMode('%');
+    } else if (toolId === 'resize-pixels' || toolId === 'change-dimensions') {
+      setResizeMode('px');
+    }
+  }, [toolId]);
+
   // --- CROPPER & ROTATION STATES ---
   const [cropRatioPreset, setCropRatioPreset] = useState('Freeform');
-  const [gridOverlay, setGridOverlay] = useState('thirds'); // 'none', 'thirds', 'golden'
-  const [rotationAngle, setRotationAngle] = useState(0); // -180 to 180 continuous degrees
-  const [rotation, setRotation] = useState(90); // Preset rotation (90, 180, 270)
+  const [gridOverlay, setGridOverlay] = useState('thirds');
+  const [rotationAngle, setRotationAngle] = useState(0);
+  const [rotation, setRotation] = useState(90);
   
   // --- FLIP IMAGE DEDICATED STATES ---
-  const [flipAxis, setFlipAxis] = useState('horizontal'); // 'horizontal', 'vertical', 'dual'
-  const [flipScope, setFlipScope] = useState('full'); // 'full' or 'selective'
+  const [flipAxis, setFlipAxis] = useState('horizontal');
+  const [flipScope, setFlipScope] = useState('full');
   
   const [flipHoriz, setFlipHoriz] = useState(false);
   const [flipVert, setFlipVert] = useState(false);
@@ -292,7 +301,7 @@ const AdvancedCompressImage = ({ toolId }) => {
 
   const containerRef = useRef(null);
   const isDragging = useRef(false);
-  const dragType = useRef(null); // 'move', 'nw', 'ne', 'sw', 'se', 'pan'
+  const dragType = useRef(null);
   const startMouse = useRef({ x: 0, y: 0 });
   const startBox = useRef({ x: 0, y: 0, w: 0, h: 0 });
   const startPan = useRef({ x: 0, y: 0 });
@@ -303,13 +312,13 @@ const AdvancedCompressImage = ({ toolId }) => {
   // Live File Size Estimator
   const estimatedSizeBytes = useMemo(() => {
     if (!activeInfo.size || activeInfo.width === 0 || activeInfo.height === 0) return 0;
-    let targetW = width;
-    let targetH = height;
+    let targetW = width || activeInfo.width;
+    let targetH = height || activeInfo.height;
 
     if (currentTool === 'crop-image') {
       targetW = Math.round((activeInfo.width * cropBox.w) / 100);
       targetH = Math.round((activeInfo.height * cropBox.h) / 100);
-    } else if (resizeMode === '%') {
+    } else if (currentTool === 'resize-percentage' || resizeMode === '%') {
       targetW = Math.round(activeInfo.width * (pctVal / 100));
       targetH = Math.round(activeInfo.height * (pctVal / 100));
     }
@@ -474,33 +483,31 @@ const AdvancedCompressImage = ({ toolId }) => {
       const sourceW = bitmap.width;
       const sourceH = bitmap.height;
 
-      // Determine target canvas dimensions
-      let renderW = width || sourceW;
-      let renderH = height || sourceH;
+      // Calculate Target Canvas Dimensions dynamically per file
+      let renderW = sourceW;
+      let renderH = sourceH;
 
-      // Determine total rotation angle depending on active tool
-      const currentAngle = currentTool === 'rotate-image' 
-        ? rotation 
-        : currentTool === 'crop-image' 
-        ? rotationAngle 
-        : 0;
-
-      // Swap canvas dimensions if rotated 90 or 270 degrees
-      const normalizedAngle = ((currentAngle % 360) + 360) % 360;
-      if (normalizedAngle === 90 || normalizedAngle === 270) {
-        renderW = height || sourceH;
-        renderH = width || sourceW;
-      }
-
-      if (currentTool === 'crop-image') {
-        renderW = Math.round((sourceW * cropBox.w) / 100);
-        renderH = Math.round((sourceH * cropBox.h) / 100);
-      } else if (resizeMode === '%') {
+      if (currentTool === 'resize-percentage' || (currentTool === 'resize-image' && resizeMode === '%')) {
         renderW = Math.round(sourceW * (pctVal / 100));
         renderH = Math.round(sourceH * (pctVal / 100));
+      } else if (['resize-image', 'change-dimensions', 'resize-pixels'].includes(currentTool) || (currentTool === 'resize-image' && resizeMode === 'px')) {
+        renderW = width > 0 ? width : sourceW;
+        renderH = height > 0 ? height : sourceH;
+      } else if (currentTool === 'crop-image') {
+        renderW = Math.round((sourceW * cropBox.w) / 100);
+        renderH = Math.round((sourceH * cropBox.h) / 100);
       } else if (currentTool === 'make-square' || currentTool === 'circular-crop') {
         renderW = Math.min(sourceW, sourceH);
         renderH = renderW;
+      }
+
+      // Rotate dimensions if required by rotation tools
+      const currentAngle = currentTool === 'rotate-image' ? rotation : currentTool === 'crop-image' ? rotationAngle : 0;
+      const normalizedAngle = ((currentAngle % 360) + 360) % 360;
+      if (normalizedAngle === 90 || normalizedAngle === 270) {
+        const temp = renderW;
+        renderW = renderH;
+        renderH = temp;
       }
 
       const canvas = document.createElement('canvas');
@@ -517,27 +524,22 @@ const AdvancedCompressImage = ({ toolId }) => {
       ctx.imageSmoothingQuality = 'high';
 
       if (currentTool === 'flip-image' && flipScope === 'selective') {
-        // 1. Draw base full image first
         ctx.drawImage(bitmap, 0, 0, sourceW, sourceH, 0, 0, renderW, renderH);
 
-        // 2. Compute exact selective box pixel region
         const srcX = Math.round((sourceW * cropBox.x) / 100);
         const srcY = Math.round((sourceH * cropBox.y) / 100);
         const srcW = Math.round((sourceW * cropBox.w) / 100);
         const srcH = Math.round((sourceH * cropBox.h) / 100);
 
-        // 3. Erase underlying selection rectangle to prevent double-image overlap artifacts
         ctx.clearRect(srcX, srcY, srcW, srcH);
         if (effectiveFormat === 'image/jpeg') {
           ctx.fillStyle = '#FFFFFF';
           ctx.fillRect(srcX, srcY, srcW, srcH);
         }
 
-        // 4. Calculate flip matrix scales
         const scaleX = (flipAxis === 'horizontal' || flipAxis === 'dual') ? -1 : 1;
         const scaleY = (flipAxis === 'vertical' || flipAxis === 'dual') ? -1 : 1;
 
-        // 5. Draw transformed selection slice
         ctx.save();
         ctx.translate(srcX + srcW / 2, srcY + srcH / 2);
         ctx.scale(scaleX, scaleY);
@@ -628,7 +630,7 @@ const AdvancedCompressImage = ({ toolId }) => {
             ? 'Convert images between JPG, PNG, WEBP, and BMP formats with instant quality settings & live file size estimation.'
             : currentTool === 'flip-image'
             ? 'Horizontal (left-right), Vertical (top-bottom), and Dual-Axis 180° inversion flipping. Supports selective layer flipping and live preview.'
-            : currentTool === 'resize-image' || ['change-dimensions', 'resize-pixels', 'resize-percentage'].includes(currentTool)
+            : ['resize-image', 'change-dimensions', 'resize-pixels', 'resize-percentage'].includes(currentTool)
             ? 'Batch scale dimensions via manual px inputs, percentage shortcuts, aspect ratio locking & real-time file size estimation.'
             : currentTool === 'crop-image'
             ? 'Interactive cropper featuring Rule-of-Thirds & Golden Ratio overlays, zoom, pan controls, continuous rotation & high-resolution rendering.'
@@ -700,7 +702,6 @@ const AdvancedCompressImage = ({ toolId }) => {
             <div className="space-y-5">
               <div className="p-4 bg-gray-50 rounded-xl space-y-4 border border-gray-200">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Flip Axis Selector */}
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-2">Flip Axis Target</label>
                     <div className="grid grid-cols-3 gap-2">
@@ -737,7 +738,6 @@ const AdvancedCompressImage = ({ toolId }) => {
                     </div>
                   </div>
 
-                  {/* Selective / Layer Flipping Scope */}
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-2">Flipping Scope</label>
                     <div className="grid grid-cols-2 gap-2">
@@ -770,7 +770,6 @@ const AdvancedCompressImage = ({ toolId }) => {
                 </div>
               </div>
 
-              {/* Non-Destructive Live Preview Stage */}
               <div
                 ref={containerRef}
                 onMouseMove={onMouseMove}
@@ -793,7 +792,6 @@ const AdvancedCompressImage = ({ toolId }) => {
                     className="pointer-events-none transition-transform duration-150"
                   />
 
-                  {/* Selective Layer Region Overlay Box */}
                   {flipScope === 'selective' && (
                     <div
                       style={{
@@ -841,7 +839,6 @@ const AdvancedCompressImage = ({ toolId }) => {
                 </div>
               </div>
 
-              {/* Interactive View Container */}
               <div
                 ref={containerRef}
                 onMouseDown={(e) => startDrag(e, 'pan')}
@@ -862,7 +859,6 @@ const AdvancedCompressImage = ({ toolId }) => {
                   className="pointer-events-none transition-transform duration-75"
                 />
 
-                {/* Bounding Box Overlay */}
                 <div
                   style={{
                     left: `${cropBox.x}%`,
@@ -873,7 +869,6 @@ const AdvancedCompressImage = ({ toolId }) => {
                   onMouseDown={(e) => startDrag(e, 'move')}
                   className="absolute border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] cursor-move"
                 >
-                  {/* Grid Lines */}
                   {gridOverlay === 'thirds' && (
                     <div className="w-full h-full grid grid-cols-3 grid-rows-3 pointer-events-none border border-white/30">
                       {[...Array(9)].map((_, i) => (
@@ -891,7 +886,6 @@ const AdvancedCompressImage = ({ toolId }) => {
                     </div>
                   )}
 
-                  {/* Corner Handles */}
                   <div onMouseDown={(e) => startDrag(e, 'nw')} className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 bg-indigo-600 border border-white rounded-full cursor-nwse-resize" />
                   <div onMouseDown={(e) => startDrag(e, 'ne')} className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-indigo-600 border border-white rounded-full cursor-nesw-resize" />
                   <div onMouseDown={(e) => startDrag(e, 'sw')} className="absolute -bottom-1.5 -left-1.5 w-3.5 h-3.5 bg-indigo-600 border border-white rounded-full cursor-nesw-resize" />
@@ -899,7 +893,6 @@ const AdvancedCompressImage = ({ toolId }) => {
                 </div>
               </div>
 
-              {/* Continuous Angle Slider */}
               <div>
                 <div className="flex justify-between text-xs font-semibold text-gray-700 mb-1">
                   <span>Continuous Angle: {rotationAngle}°</span>
@@ -915,7 +908,6 @@ const AdvancedCompressImage = ({ toolId }) => {
                 />
               </div>
 
-              {/* Presets & Pixel Accuracy Display */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <label className="text-xs font-semibold text-gray-600">Aspect Ratio Presets</label>
@@ -957,68 +949,90 @@ const AdvancedCompressImage = ({ toolId }) => {
             </div>
           )}
 
-          {/* --- RESIZER TOOL CONTROLS --- */}
+          {/* --- RESIZER TOOL CONTROLS (PIXELS & PERCENTAGE) --- */}
           {['resize-image', 'change-dimensions', 'resize-pixels', 'resize-percentage'].includes(currentTool) && (
             <div className="p-5 bg-gray-50 rounded-xl space-y-5">
               <div className="flex items-center justify-between">
                 <div className="flex space-x-2 bg-gray-200 p-1 rounded-lg text-xs font-bold">
-                  <button
-                    onClick={() => setResizeMode('px')}
-                    className={`px-3 py-1 rounded-md transition ${resizeMode === 'px' ? 'bg-white shadow text-indigo-600' : 'text-gray-600'}`}
-                  >
-                    Pixels (px)
-                  </button>
-                  <button
-                    onClick={() => setResizeMode('%')}
-                    className={`px-3 py-1 rounded-md transition ${resizeMode === '%' ? 'bg-white shadow text-indigo-600' : 'text-gray-600'}`}
-                  >
-                    Percentage (%)
-                  </button>
+                  {currentTool !== 'resize-percentage' && (
+                    <button
+                      onClick={() => setResizeMode('px')}
+                      className={`px-3 py-1 rounded-md transition ${resizeMode === 'px' ? 'bg-white shadow text-indigo-600' : 'text-gray-600'}`}
+                    >
+                      Pixels (px)
+                    </button>
+                  )}
+                  {currentTool !== 'resize-pixels' && currentTool !== 'change-dimensions' && (
+                    <button
+                      onClick={() => setResizeMode('%')}
+                      className={`px-3 py-1 rounded-md transition ${resizeMode === '%' ? 'bg-white shadow text-indigo-600' : 'text-gray-600'}`}
+                    >
+                      Percentage (%)
+                    </button>
+                  )}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setKeepAspectRatio(!keepAspectRatio)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 ${
-                    keepAspectRatio ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-200 text-gray-600'
-                  }`}
-                >
-                  {keepAspectRatio ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
-                  <span>{keepAspectRatio ? 'Aspect Ratio Locked' : 'Ratio Unlocked'}</span>
-                </button>
+                {resizeMode === 'px' && (
+                  <button
+                    type="button"
+                    onClick={() => setKeepAspectRatio(!keepAspectRatio)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 ${
+                      keepAspectRatio ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-200 text-gray-600'
+                    }`}
+                  >
+                    {keepAspectRatio ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                    <span>{keepAspectRatio ? 'Aspect Ratio Locked' : 'Ratio Unlocked'}</span>
+                  </button>
+                )}
               </div>
 
-              {resizeMode === 'px' ? (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">Width (px)</label>
-                    <input
-                      type="number"
-                      value={width}
-                      onChange={(e) => handleWidthInput(e.target.value)}
-                      className="w-full border rounded-lg p-2 text-sm bg-white font-semibold"
-                    />
+              {resizeMode === 'px' && currentTool !== 'resize-percentage' ? (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">Width (px)</label>
+                      <input
+                        type="number"
+                        value={width}
+                        onChange={(e) => handleWidthInput(e.target.value)}
+                        className="w-full border rounded-lg p-2 text-sm bg-white font-semibold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">Height (px)</label>
+                      <input
+                        type="number"
+                        value={height}
+                        onChange={(e) => handleHeightInput(e.target.value)}
+                        className="w-full border rounded-lg p-2 text-sm bg-white font-semibold"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">Height (px)</label>
-                    <input
-                      type="number"
-                      value={height}
-                      onChange={(e) => handleHeightInput(e.target.value)}
-                      className="w-full border rounded-lg p-2 text-sm bg-white font-semibold"
-                    />
-                  </div>
+                  <p className="text-xs text-gray-500 font-medium">Original Dimensions: {activeInfo.width} × {activeInfo.height} px</p>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  <label className="block text-xs font-semibold text-gray-500">Preset Scaling Shortcuts</label>
-                  <div className="flex space-x-2">
-                    {[25, 50, 75, 100].map((p) => (
+                <div className="space-y-3">
+                  <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
+                    <span>Resize Scale: {pctVal}%</span>
+                    <span className="text-indigo-600 font-bold">
+                      Calculated Target: {Math.round(activeInfo.width * (pctVal / 100))} × {Math.round(activeInfo.height * (pctVal / 100))} px
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="200"
+                    value={pctVal}
+                    onChange={(e) => applyPresetScaling(Number(e.target.value))}
+                    className="w-full accent-indigo-600"
+                  />
+                  <div className="flex space-x-2 pt-1">
+                    {[25, 50, 75, 100, 125, 150].map((p) => (
                       <button
                         key={p}
                         type="button"
                         onClick={() => applyPresetScaling(p)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                        className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
                           pctVal === p ? 'bg-indigo-600 text-white' : 'bg-white border text-gray-700 hover:border-indigo-400'
                         }`}
                       >
@@ -1031,7 +1045,7 @@ const AdvancedCompressImage = ({ toolId }) => {
             </div>
           )}
 
-          {/* Export Settings & Format Conversion */}
+          {/* Export Settings */}
           {currentTool !== 'format-converter' && (
             <div className="grid grid-cols-2 gap-3 bg-gray-50 p-4 rounded-xl">
               <div>
@@ -1078,7 +1092,6 @@ const AdvancedCompressImage = ({ toolId }) => {
             {isProcessing ? 'Processing Images...' : `Process ${files.length} Image(s)`}
           </button>
 
-          {/* Download Links */}
           {batchResults.length > 0 && (
             <div className="space-y-2 pt-2">
               <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Processed Output</h4>
