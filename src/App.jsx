@@ -75,8 +75,8 @@ function convertUnits(slug, amount, from, to) {
 // --- IMAGE TOOLS DEFINITION ---
 export const IMAGE_TOOLS = [
   { id: 'compress-image', name: 'Compress Image', description: 'Reduce image file size (KB/MB) while keeping pixel dimensions sharp.', keywords: ['compress', 'jpg', 'png', 'webp', 'reduce size', 'kb', 'mb'] },
-  { id: 'resize-image', name: 'Resize Image', description: 'Change image dimensions (width & height in pixels) and aspect ratio.', keywords: ['resize', 'dimensions', 'width', 'height', 'scale', 'pixels'] },
-  { id: 'crop-image', name: 'Crop Image', description: 'Crop custom areas from your image with aspect ratio framing.', keywords: ['crop', 'trim', 'cut'] },
+  { id: 'resize-image', name: 'Resize Image', description: 'Change overall image resolution (width & height in pixels) by scaling.', keywords: ['resize', 'dimensions', 'width', 'height', 'scale', 'pixels'] },
+  { id: 'crop-image', name: 'Crop Image', description: 'Trim and cut outer background edges from your image.', keywords: ['crop', 'trim', 'cut', 'aspect ratio'] },
   { id: 'rotate-image', name: 'Rotate Image', description: 'Rotate image by 90, 180, or 270 degrees.', keywords: ['rotate', 'turn', 'angle'] },
   { id: 'flip-image', name: 'Flip Image', description: 'Flip image horizontally or vertically.', keywords: ['flip', 'mirror'] },
   { id: 'jpg-to-png', name: 'JPG to PNG', description: 'Convert JPG images to PNG format.', keywords: ['jpg', 'png', 'convert'] },
@@ -257,15 +257,16 @@ const AdvancedCompressImage = ({ toolId }) => {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [origInfo, setOrigInfo] = useState({ width: 0, height: 0, size: 0, type: '' });
   
+  // Resize Tool States
   const [width, setWidth] = useState(0);
   const [height, setHeight] = useState(0);
   const [keepAspectRatio, setKeepAspectRatio] = useState(true);
   const [activeRatio, setActiveRatio] = useState('Original');
-  
-  // Crop Tool Specific States
+
+  // Crop Tool Specific States (Independent Trimming Boundaries)
+  const [cropWidth, setCropWidth] = useState(0);
+  const [cropHeight, setCropHeight] = useState(0);
   const [cropRatio, setCropRatio] = useState('Original');
-  const [cropWidth, setCropWidth] = useState(100);
-  const [cropHeight, setCropHeight] = useState(100);
 
   const [percentage, setPercentage] = useState(100);
   const [targetSizeVal, setTargetSizeVal] = useState('');
@@ -276,7 +277,7 @@ const AdvancedCompressImage = ({ toolId }) => {
   const [flipMode, setFlipMode] = useState('horizontal');
   const [blurRadius, setBlurRadius] = useState(4);
   const [watermarkText, setWatermarkText] = useState('');
-
+  
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState(null);
 
@@ -334,6 +335,7 @@ const AdvancedCompressImage = ({ toolId }) => {
     img.src = url;
   };
 
+  // RESIZE TOOL HANDLERS (Scales complete image content)
   const handleWidthChange = (val) => {
     const w = Number(val);
     setWidth(w);
@@ -362,13 +364,11 @@ const AdvancedCompressImage = ({ toolId }) => {
       setHeight(minDim);
     } else if (ratio === '16:9') {
       if (origInfo.width >= origInfo.height) {
-        const targetH = Math.round((origInfo.width * 9) / 16);
         setWidth(origInfo.width);
-        setHeight(targetH);
+        setHeight(Math.round((origInfo.width * 9) / 16));
       } else {
-        const targetW = Math.round((origInfo.height * 16) / 9);
-        setWidth(targetW);
         setHeight(origInfo.height);
+        setWidth(Math.round((origInfo.height * 16) / 9));
       }
     } else if (ratio === '4:3') {
       if (origInfo.width >= origInfo.height) {
@@ -391,7 +391,7 @@ const AdvancedCompressImage = ({ toolId }) => {
     }
   };
 
-  // Dedicated Aspect Ratio Framing for Crop Tool
+  // CROP TOOL HANDLERS (Trims outer edges inside image bounds)
   const applyCropPresetRatio = (ratio) => {
     if (!origInfo.width || !origInfo.height) return;
     setCropRatio(ratio);
@@ -404,9 +404,9 @@ const AdvancedCompressImage = ({ toolId }) => {
       const targetH = Math.round((origInfo.width * 9) / 16);
       if (targetH <= origInfo.height) {
         setCropWidth(origInfo.width);
-        setCropHeight(targetH);
+        setCropHeight(targetH); // Trims excess height off top & bottom
       } else {
-        setCropWidth(Math.round((origInfo.height * 16) / 9));
+        setCropWidth(Math.round((origInfo.height * 16) / 9)); // Trims excess width off sides
         setCropHeight(origInfo.height);
       }
     } else if (ratio === '4:3') {
@@ -436,15 +436,15 @@ const AdvancedCompressImage = ({ toolId }) => {
     let outW = width || sourceWidth;
     let outH = height || sourceHeight;
 
-    if (currentTool === 'resize-percentage') {
+    if (currentTool === 'crop-image') {
+      outW = Math.min(cropWidth, sourceWidth);
+      outH = Math.min(cropHeight, sourceHeight);
+    } else if (currentTool === 'resize-percentage') {
       outW = Math.max(1, Math.round(sourceWidth * (percentage / 100)));
       outH = Math.max(1, Math.round(sourceHeight * (percentage / 100)));
     } else if (currentTool === 'make-square' || currentTool === 'circular-crop') {
       outW = Math.min(sourceWidth, sourceHeight);
       outH = outW;
-    } else if (currentTool === 'crop-image') {
-      outW = Math.min(cropWidth, sourceWidth);
-      outH = Math.min(cropHeight, sourceHeight);
     } else if (currentTool === 'rotate-image' && (rotation === 90 || rotation === 270)) {
       outW = sourceHeight;
       outH = sourceWidth;
@@ -464,7 +464,12 @@ const AdvancedCompressImage = ({ toolId }) => {
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
 
-      if (currentTool === 'rotate-image') {
+      if (currentTool === 'crop-image') {
+        // CROP LOGIC: Calculate center offsets and cut off excess edge pixels
+        const sx = Math.max(0, Math.floor((sourceWidth - w) / 2));
+        const sy = Math.max(0, Math.floor((sourceHeight - h) / 2));
+        ctx.drawImage(bitmap, sx, sy, w, h, 0, 0, w, h);
+      } else if (currentTool === 'rotate-image') {
         ctx.save();
         ctx.translate(w / 2, h / 2);
         ctx.rotate((rotation * Math.PI) / 180);
@@ -483,12 +488,8 @@ const AdvancedCompressImage = ({ toolId }) => {
         const sx = Math.floor((sourceWidth - w) / 2);
         const sy = Math.floor((sourceHeight - h) / 2);
         ctx.drawImage(bitmap, sx, sy, w, h, 0, 0, w, h);
-      } else if (currentTool === 'crop-image') {
-        // Crop Center Trim
-        const sx = Math.max(0, Math.floor((sourceWidth - w) / 2));
-        const sy = Math.max(0, Math.floor((sourceHeight - h) / 2));
-        ctx.drawImage(bitmap, sx, sy, w, h, 0, 0, w, h);
       } else {
+        // RESIZE / NORMAL LOGIC: Take 100% of image content and scale into canvas (w x h)
         if (currentTool === 'grayscale-image') ctx.filter = 'grayscale(1)';
         if (currentTool === 'blur-image') ctx.filter = `blur(${blurRadius}px)`;
 
@@ -585,9 +586,9 @@ const AdvancedCompressImage = ({ toolId }) => {
           {currentTool === 'compress-image' 
             ? 'Reduce file size (KB/MB) while keeping pixel dimensions sharp.' 
             : currentTool === 'resize-image'
-            ? 'Adjust width and height in pixels while locking aspect ratio.'
+            ? 'Change resolution by scaling total pixel dimensions.'
             : currentTool === 'crop-image'
-            ? 'Trim outer boundaries using precise ratio framing or pixel dimensions.'
+            ? 'Trim away outer edges using custom boundary framing or aspect ratio presets.'
             : 'Process and adjust image properties client-side.'}
         </p>
       </div>
@@ -622,9 +623,9 @@ const AdvancedCompressImage = ({ toolId }) => {
             {currentTool === 'crop-image' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-gray-700">Crop Area Boundaries (Pixels)</span>
+                  <span className="text-xs font-semibold text-gray-700">Crop Area Boundaries (Trims Edges)</span>
                   <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
-                    Target Canvas: {cropWidth} × {cropHeight} px
+                    Target Crop: {cropWidth} × {cropHeight} px
                   </span>
                 </div>
 
@@ -728,7 +729,7 @@ const AdvancedCompressImage = ({ toolId }) => {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <span className="text-xs font-semibold text-gray-700">Dimensions (Pixels)</span>
+                    <span className="text-xs font-semibold text-gray-700">Dimensions (Scales Image)</span>
                     <button
                       type="button"
                       onClick={() => setKeepAspectRatio(!keepAspectRatio)}
