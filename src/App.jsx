@@ -152,7 +152,6 @@ const parsePageRange = (rangeStr, totalPages) => {
   return Array.from(pages).sort((a, b) => a - b);
 };
 
-// Sequence parser that preserves exact order specified (e.g. "3, 1, 2")
 const parsePageSequence = (rangeStr, totalPages) => {
   if (!rangeStr || !rangeStr.trim()) {
     return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -177,7 +176,6 @@ const parsePageSequence = (rangeStr, totalPages) => {
 };
 
 const TOOLS = [
-  // --- CONVERTERS (20) ---
   ...CONVERTER_DATA.map(([slug, name, desc, keywords, units]) => ({
     id: `${slug}-conv`,
     rawSlug: slug,
@@ -189,7 +187,6 @@ const TOOLS = [
     units
   })),
 
-  // --- CALCULATORS (20) ---
   { id: 'percentage-calc', name: 'Percentage Calculator', category: 'calculators', icon: 'Percent', desc: 'Find a percentage of a value, or the percentage one value is of another.', keywords: 'percent rate of fraction' },
   { id: 'age-calc', name: 'Age Calculator', category: 'calculators', icon: 'Clock', desc: 'Calculate age in years, months and days from a birth date.', keywords: 'birthday birth date how old living' },
   { id: 'bmi-calc', name: 'BMI Calculator', category: 'calculators', icon: 'Activity', desc: 'Estimate body mass index from height and weight.', keywords: 'body mass index health weight fitness' },
@@ -211,7 +208,6 @@ const TOOLS = [
   { id: 'unit-price', name: 'Unit Price Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Compare cost per standard unit for shopping decisions.', keywords: 'price per unit compare value cost grocery' },
   { id: 'savings-goal', name: 'Savings Goal Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Estimate the monthly amount needed to reach a savings target.', keywords: 'saving plan monthly savings goal target' },
 
-  // --- IMAGE TOOLS ---
   ...IMAGE_TOOLS.map(t => ({
     id: t.id,
     name: t.name,
@@ -221,7 +217,6 @@ const TOOLS = [
     keywords: t.keywords.join(' ')
   })),
 
-  // --- PDF TOOLS ---
   ...PDF_TOOLS.map(t => ({
     id: t.id,
     name: t.name,
@@ -675,7 +670,6 @@ const PdfToolEngine = ({ toolId }) => {
         const srcDoc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
         const totalPages = srcDoc.getPageCount();
 
-        // Use parsePageSequence to preserve user-specified order
         const selectedPageNums = parsePageSequence(pages, totalPages);
 
         if (selectedPageNums.length === 0) {
@@ -876,11 +870,9 @@ const PdfToolEngine = ({ toolId }) => {
         const file = files[0];
         const rawBuffer = await file.arrayBuffer();
 
-        // Load document ignoring encryption flags
         const doc = await PDFDocument.load(rawBuffer, { ignoreEncryption: true });
         const totalPages = doc.getPageCount();
 
-        // Copy into a clean PDF container to strip restriction metadata dictionaries
         const cleanDoc = await PDFDocument.create();
         const copiedPages = await cleanDoc.copyPages(doc, doc.getPageIndices());
         copiedPages.forEach((p) => cleanDoc.addPage(p));
@@ -905,7 +897,6 @@ const PdfToolEngine = ({ toolId }) => {
         const file = files[0];
         const doc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
         
-        // Add protection notice watermark and save output stream
         const font = await doc.embedFont(StandardFonts.Helvetica);
         const pagesList = doc.getPages();
         if (pagesList.length > 0) {
@@ -953,39 +944,45 @@ const PdfToolEngine = ({ toolId }) => {
       }
       else if (['pdf-to-jpg', 'pdf-to-png'].includes(toolId)) {
         const file = files[0];
-        const doc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
-        const totalPages = doc.getPageCount();
+        const arrayBuffer = await file.arrayBuffer();
+
+        const pdfjsLib = await import('pdfjs-dist');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const totalPages = pdf.numPages;
         const newDownloads = [];
 
-        for (let i = 0; i < totalPages; i++) {
-          const page = doc.getPage(i);
-          const { width, height } = page.getSize();
+        for (let i = 1; i <= totalPages; i++) {
+          const page = await pdf.getPage(i);
+          const viewport = page.getViewport({ scale: 2.0 });
 
           const canvas = document.createElement('canvas');
-          canvas.width = Math.min(2000, Math.round(width * 2));
-          canvas.height = Math.min(2000, Math.round(height * 2));
           const ctx = canvas.getContext('2d');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
 
-          ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.fillStyle = '#1e293b';
-          ctx.font = 'bold 24px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText(`PDF Page ${i + 1} (${Math.round(width)}x${Math.round(height)} pt)`, canvas.width / 2, canvas.height / 2);
+          const renderContext = {
+            canvasContext: ctx,
+            viewport: viewport
+          };
+
+          await page.render(renderContext).promise;
 
           const mimeType = toolId === 'pdf-to-jpg' ? 'image/jpeg' : 'image/png';
           const ext = toolId === 'pdf-to-jpg' ? 'jpg' : 'png';
-          const blob = await new Promise((res) => canvas.toBlob(res, mimeType, 0.9));
+          
+          const blob = await new Promise((res) => canvas.toBlob(res, mimeType, 0.92));
 
           newDownloads.push({
             url: URL.createObjectURL(blob),
-            name: `page_${i + 1}.${ext}`,
+            name: `page_${i}.${ext}`,
             size: blob.size
           });
         }
 
         setDownloads(newDownloads);
-        setNotice(`Rendered ${totalPages} pages into image files.`);
+        setNotice(`Successfully rendered ${totalPages} page(s) into high-resolution ${toolId === 'pdf-to-jpg' ? 'JPG' : 'PNG'} images.`);
       }
       else {
         const file = files[0];
