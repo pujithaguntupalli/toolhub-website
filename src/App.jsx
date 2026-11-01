@@ -589,7 +589,7 @@ const AdvancedCompressImage = ({ toolId }) => {
           ctx.drawImage(bitmap, 0, 0, sourceW, sourceH, dx, dy, drawW, drawH);
         }
       } 
-      // --- DEDICATED CIRCULAR CROP LOGIC ---
+      // --- DEDICATED CIRCULAR CROP LOGIC (FIXED PANNING AXES) ---
       else if (currentTool === 'circular-crop') {
         const circleDiam = renderW;
         ctx.clearRect(0, 0, circleDiam, circleDiam);
@@ -599,9 +599,8 @@ const AdvancedCompressImage = ({ toolId }) => {
         ctx.arc(circleDiam / 2, circleDiam / 2, circleDiam / 2, 0, Math.PI * 2);
         ctx.clip();
 
-        // Calculate source cropping region based on position offsets
-        const baseMin = Math.min(sourceW, sourceH);
-        const cropDim = Math.round(baseMin * (circleScale / 100));
+        // Calculate available movement ranges independently along X and Y axes
+        const cropDim = Math.round(Math.min(sourceW, sourceH) * (circleScale / 100));
 
         const maxOffsetX = sourceW - cropDim;
         const maxOffsetY = sourceH - cropDim;
@@ -863,7 +862,7 @@ const AdvancedCompressImage = ({ toolId }) => {
             </div>
           )}
 
-          {/* --- CIRCULAR CROP TOOL CONTROLS & PREVIEW --- */}
+          {/* --- CIRCULAR CROP TOOL CONTROLS & UPDATED LIVE PREVIEW --- */}
           {currentTool === 'circular-crop' && (
             <div className="space-y-4">
               <div className="p-4 bg-gray-50 rounded-xl space-y-3 border border-gray-200">
@@ -914,7 +913,7 @@ const AdvancedCompressImage = ({ toolId }) => {
                 </p>
               </div>
 
-              {/* Circular Live Preview */}
+              {/* Circular Live Preview with Axis Responsiveness */}
               <div className="w-full h-[320px] bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center p-4">
                 <div
                   className="relative rounded-full overflow-hidden border-4 border-indigo-500 shadow-2xl flex items-center justify-center bg-slate-800"
@@ -927,10 +926,14 @@ const AdvancedCompressImage = ({ toolId }) => {
                     src={activeInfo.url}
                     alt="Circle Preview Target"
                     style={{
+                      width: activeInfo.width >= activeInfo.height ? 'auto' : '100%',
+                      height: activeInfo.height > activeInfo.width ? 'auto' : '100%',
+                      minWidth: '100%',
+                      minHeight: '100%',
                       objectFit: 'cover',
                       objectPosition: `${circleCenterX}% ${circleCenterY}%`
                     }}
-                    className="w-full h-full"
+                    className="max-w-none"
                   />
                 </div>
               </div>
