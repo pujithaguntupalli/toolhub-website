@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import {
+import { 
   Search, Calculator, ArrowRightLeft, FileText, Image as ImageIcon, 
   Download, Upload, Trash2, RotateCw, Sparkles, AlertCircle, ChevronRight,
   Layers, Lock, Unlock, ArrowLeft, Star, Clock, Percent, Volume2, Cpu,
@@ -318,6 +318,13 @@ const AdvancedCompressImage = ({ toolId }) => {
   const currentTool = toolId || 'format-converter';
   const activeInfo = origInfos[activeFileIdx] || { width: 0, height: 0, size: 0, url: '', format: 'image/jpeg' };
 
+  // --- AUTO-SET 100% QUALITY FOR METADATA REMOVAL ---
+  useEffect(() => {
+    if (currentTool === 'remove-metadata') {
+      setQuality(100);
+    }
+  }, [currentTool]);
+
   useEffect(() => {
     if (toolId === 'resize-percentage') {
       setResizeMode('%');
@@ -570,7 +577,7 @@ const AdvancedCompressImage = ({ toolId }) => {
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
 
-      // --- 1. DEDICATED GRAYSCALE FILTER ENGINE (DIRECT FILTER EXPORT FIX) ---
+      // --- 1. DEDICATED GRAYSCALE FILTER ENGINE ---
       if (currentTool === 'grayscale-image') {
         ctx.save();
         if (grayscaleMode === 'threshold') {
@@ -578,7 +585,6 @@ const AdvancedCompressImage = ({ toolId }) => {
           ctx.drawImage(bitmap, 0, 0, renderW, renderH);
           ctx.restore();
 
-          // Apply binary high-contrast cutoff directly to canvas pixels
           const imgData = ctx.getImageData(0, 0, renderW, renderH);
           const data = imgData.data;
           const factor = grayscaleAmount / 100;
@@ -655,8 +661,18 @@ const AdvancedCompressImage = ({ toolId }) => {
           ctx.restore();
         }
       }
-      // --- 4. DEDICATED REMOVE METADATA ENGINE ---
+      // --- 4. DEDICATED REMOVE METADATA ENGINE (CLEAN STRIP FIX) ---
       else if (currentTool === 'remove-metadata') {
+        // Complete clear of the canvas buffer to guarantee zero residual metadata inheritance
+        ctx.clearRect(0, 0, renderW, renderH);
+        
+        // Opaque white fill for JPEG outputs
+        if (effectiveFormat === 'image/jpeg') {
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, renderW, renderH);
+        }
+
+        // Clean-slate raw pixel draw (strips all EXIF, XMP, IPTC & GPS headers)
         ctx.drawImage(bitmap, 0, 0, renderW, renderH);
       }
       // --- OTHER TOOLS ---
