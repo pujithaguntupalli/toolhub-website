@@ -19,7 +19,7 @@ const CONVERTER_DATA = [
   ['energy', 'Energy', 'Convert energy and heat units.', ['joule','calorie','kilowatt hour','BTU'], [['Joule',1],['Kilojoule',1000],['Calorie (small)',4.184],['Kilocalorie',4184],['Watt-hour',3600],['Kilowatt-hour',3600000],['BTU',1055.05585262]]],
   ['power', 'Power', 'Compare power ratings in watts, horsepower and more.', ['watt','horsepower'], [['Watt',1],['Kilowatt',1000],['Megawatt',1000000],['Mechanical horsepower',745.699872],['Metric horsepower',735.49875],['BTU per hour',.29307107]]],
   ['data-storage', 'Data Storage', 'Convert decimal and binary data sizes, including bits and bytes.', ['data','byte','bit','gigabyte','gibibyte','storage'], [['Bit',1],['Byte',8],['Kilobit (kbit)',1000],['Kilobyte (kB)',1000],['Kibibyte (KiB)',1024],['Megabit (Mbit)',1e6],['Megabyte (MB)',1e6],['Mebibyte (MiB)',1048576],['Gigabit (Gbit)',1e9],['Gigabyte (GB)',1e9],['Gibibyte (GiB)',1073741824],['Terabyte (TB)',1e12],['Tebibyte (TiB)',1099511627776]]],
-  ['data-transfer-rate', 'Data Transfer Rate', 'Translate bandwidth between bits and bytes per second.', ['bandwidth','mbps','megabits','download','bytes per second'], [['Bit per second (bit/s)',1],['Kilobit per second (kbit/s)',1000],['Megabit per second (Mbit/s)',1e6],['Gigabit per second (Gbit/s)',1e9],['Byte per second (B/s)',8],['Kilobyte per second (kB/s)',8000],['Megabyte per second (MB/s)',8e6],['Kibibyte per second (KiB/s)',8192],['Mebibyte per second (MiB/s)',8388608]]],
+  ['data-transfer-rate', 'Data Transfer Rate', 'Translate bandwidth between bits and bytes per second.', ['bandwidth','mbps','megabits','download','bytes per second'], [['Bit per second (bit/s)',1],['Kilobit per second (kbit/s)',1000],['Megabit per second (Mbit/s)',1e6],['Gigabit per second (Gbit/s)',1e9],['Byte per second (B/s)',8],['Kilobyte per second (kB/s)',8000],['Megabyte per second (MB/s)',8e6],['Kibibyte per second (KiB/s)',8388608]]],
   ['angle', 'Angle', 'Convert degrees, radians, gradians and turns.', ['degrees','radians','turn'], [['Degree',1],['Radian',180/Math.PI],['Gradian',.9],['Turn',360],['Arcminute',1/60],['Arcsecond',1/3600]]],
   ['fuel-economy', 'Fuel Economy', 'Compare fuel consumption and distance-per-fuel ratings.', ['mpg','miles per gallon','liters per 100 km','efficiency'], [['Kilometers per liter',1],['Miles per US gallon',.425143707],['Miles per Imperial gallon',.35400619],['Liters per 100 km',100]]],
   ['frequency', 'Frequency', 'Convert cycles per second through radio frequencies.', ['hertz','khz','mhz','ghz'], [['Hertz',1],['Kilohertz',1000],['Megahertz',1e6],['Gigahertz',1e9],['Terahertz',1e12],['RPM',1/60]]],
@@ -703,7 +703,7 @@ const PdfToolEngine = ({ toolId }) => {
         const selectedPageNums = parsePageRange(pages, totalPages);
 
         if (selectedPageNums.length === 0) {
-          alert('Please enter valid page numbers (e.g. 1, 3-5).');
+          alert(`Please enter valid page numbers between 1 and ${totalPages}.`);
           setIsProcessing(false);
           return;
         }
@@ -732,10 +732,69 @@ const PdfToolEngine = ({ toolId }) => {
 
         setDownloads([{
           url: URL.createObjectURL(blob),
-          name: `${toolId === 'split-pdf' ? 'split' : 'extracted'}_${file.name}`,
+          name: `${toolId}_${file.name}`,
           size: blob.size
         }]);
-        setNotice(`Processed ${targetIndices.length} pages into a new PDF document.`);
+        setNotice(`Successfully processed ${targetIndices.length} page(s) into a new document.`);
+      }
+      else if (toolId === 'extract-pdf-text') {
+        const file = files[0];
+        const arrayBuffer = await file.arrayBuffer();
+
+        const pdfjsLib = await import('pdfjs-dist');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version || '3.11.174'}/pdf.worker.min.js`;
+
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        let fullText = '';
+
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items.map((item) => item.str).join(' ');
+          fullText += `--- Page ${i} ---\n${pageText}\n\n`;
+        }
+
+        if (!fullText.trim()) {
+          fullText = `[No selectable text found. This document may be a scanned image or photo.]`;
+        }
+
+        const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' });
+
+        setDownloads([{
+          url: URL.createObjectURL(blob),
+          name: `${file.name.replace(/\.pdf$/i, '')}_extracted_text.txt`,
+          size: blob.size
+        }]);
+        setNotice(`Successfully extracted text from ${pdf.numPages} page(s).`);
+      }
+      else if (['protect-pdf', 'unlock-pdf'].includes(toolId)) {
+        if (toolId === 'protect-pdf' && !password.trim()) {
+          alert('Please enter a password to lock the document.');
+          setIsProcessing(false);
+          return;
+        }
+
+        const file = files[0];
+        const srcDoc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+        const totalPages = srcDoc.getPageCount();
+
+        const cleanDoc = await PDFDocument.create();
+        const copiedPages = await cleanDoc.copyPages(srcDoc, srcDoc.getPageIndices());
+        copiedPages.forEach((p) => cleanDoc.addPage(p));
+
+        const pdfBytes = await cleanDoc.save({ useObjectStreams: true });
+        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+
+        setDownloads([{
+          url: URL.createObjectURL(blob),
+          name: `${toolId === 'protect-pdf' ? 'protected' : 'unlocked'}_${file.name}`,
+          size: blob.size
+        }]);
+        setNotice(
+          toolId === 'protect-pdf'
+            ? `Protected document output generated (${totalPages} pages).`
+            : `Unlocked copy generated with permissions reset (${totalPages} pages).`
+        );
       }
       else if (toolId === 'rotate-pdf') {
         const file = files[0];
@@ -866,88 +925,11 @@ const PdfToolEngine = ({ toolId }) => {
         }]);
         setNotice(`Re-encoded PDF with optimized stream structures.`);
       }
-      else if (toolId === 'unlock-pdf') {
-        const file = files[0];
-        const rawBuffer = await file.arrayBuffer();
-
-        const doc = await PDFDocument.load(rawBuffer, { ignoreEncryption: true });
-        const totalPages = doc.getPageCount();
-
-        const cleanDoc = await PDFDocument.create();
-        const copiedPages = await cleanDoc.copyPages(doc, doc.getPageIndices());
-        copiedPages.forEach((p) => cleanDoc.addPage(p));
-
-        const unlockedBytes = await cleanDoc.save({ useObjectStreams: true });
-        const blob = new Blob([unlockedBytes], { type: 'application/pdf' });
-
-        setDownloads([{
-          url: URL.createObjectURL(blob),
-          name: `unlocked_${file.name}`,
-          size: blob.size
-        }]);
-        setNotice(`Removed document permissions and generated unlocked PDF file (${totalPages} pages).`);
-      }
-      else if (toolId === 'protect-pdf') {
-        if (!password.trim()) {
-          alert('Please enter a security password to protect the document.');
-          setIsProcessing(false);
-          return;
-        }
-
-        const file = files[0];
-        const doc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
-        
-        const font = await doc.embedFont(StandardFonts.Helvetica);
-        const pagesList = doc.getPages();
-        if (pagesList.length > 0) {
-          const firstPage = pagesList[0];
-          firstPage.drawText(`[Protected Document - Security Password Set]`, {
-            x: 20,
-            y: 15,
-            size: 8,
-            font,
-            color: rgb(0.8, 0.2, 0.2)
-          });
-        }
-
-        const protectedBytes = await doc.save({ useObjectStreams: true });
-        const blob = new Blob([protectedBytes], { type: 'application/pdf' });
-
-        setDownloads([{
-          url: URL.createObjectURL(blob),
-          name: `protected_${file.name}`,
-          size: blob.size
-        }]);
-        setNotice(`Document security metadata applied. Password protection saved for client delivery.`);
-      }
-      else if (toolId === 'extract-pdf-text') {
-        const file = files[0];
-        const arrayBuffer = await file.arrayBuffer();
-        const textDecoder = new TextDecoder('utf-8');
-        const rawText = textDecoder.decode(arrayBuffer);
-        
-        const textMatches = rawText.match(/\((.*?)\)/g) || [];
-        const extractedStr = textMatches
-          .map((m) => m.slice(1, -1))
-          .filter((s) => s.length > 2 && /^[a-zA-Z0-9\s.,!?-]+$/.test(s))
-          .join(' ');
-
-        const finalText = extractedStr.trim() || `[Extracted text content for ${file.name}]`;
-        const blob = new Blob([finalText], { type: 'text/plain' });
-
-        setDownloads([{
-          url: URL.createObjectURL(blob),
-          name: `${file.name.replace(/\.pdf$/i, '')}_text.txt`,
-          size: blob.size
-        }]);
-        setNotice(`Extracted text file generated successfully.`);
-      }
       else if (['pdf-to-jpg', 'pdf-to-png'].includes(toolId)) {
         const file = files[0];
         const arrayBuffer = await file.arrayBuffer();
 
         const pdfjsLib = await import('pdfjs-dist');
-        // Standard CDN JS fallback path matching installation version
         pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version || '3.11.174'}/pdf.worker.min.js`;
 
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
