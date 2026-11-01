@@ -107,14 +107,12 @@ export const PDF_TOOLS = [
   { id: "reorder-pdf-pages", name: "Reorder PDF Pages", description: "Reorganize pages using a custom page sequence.", supported: true, keywords: ["organize", "sort"] },
   { id: "add-page-numbers", name: "Add Page Numbers", description: "Place customizable page numbers on every page.", supported: true, keywords: ["numbering"] },
   { id: "add-watermark", name: "Add Watermark", description: "Place a custom text watermark across every page.", supported: true, keywords: ["stamp", "text"] },
-  { id: "protect-pdf", name: "Protect PDF with Password", description: "Encrypt your PDF document with a password.", supported: true, keywords: ["encrypt", "password"] },
-  { id: "unlock-pdf", name: "Unlock PDF", description: "Remove owner password security restriction.", supported: true, keywords: ["decrypt", "password"] },
   { id: "images-to-pdf", name: "Images to PDF", description: "Combine JPEG or PNG images into a PDF.", supported: true, keywords: ["photo"] },
   { id: "jpg-to-pdf", name: "JPG to PDF", description: "Convert JPEG images into PDF pages.", supported: true, keywords: ["jpeg", "photo"] },
   { id: "png-to-pdf", name: "PNG to PDF", description: "Convert PNG images into PDF pages.", supported: true, keywords: ["photo"] },
   { id: "pdf-to-jpg", name: "PDF to JPG", description: "Render PDF pages into JPEG images.", supported: true, keywords: ["convert", "image"] },
   { id: "pdf-to-png", name: "PDF to PNG", description: "Render PDF pages into PNG images.", supported: true, keywords: ["convert", "image"] },
-  { id: "extract-pdf-text", name: "Extract PDF Text", description: "Extract selectable text content into a text file.", supported: true, keywords: ["copy", "plain text"] },
+  { id: "extract-pdf-text", name: "Extract PDF Text", description: "Extract selectable text content from specific pages into a plain text file.", supported: true, keywords: ["copy", "plain text", "read text"] },
   { id: "add-text-to-pdf", name: "Add Text to PDF", description: "Annotate and add customizable text lines to pages.", supported: true, keywords: ["write", "annotate"] },
   { id: "crop-pdf-pages", name: "Crop PDF Pages", description: "Trim page margins by applying custom margins.", supported: true, keywords: ["trim"] },
   { id: "organize-pdf-pages", name: "Organize PDF Pages", description: "Filter or rearrange PDF page structure.", supported: true, keywords: ["reorder", "sort"] }
@@ -249,9 +247,7 @@ const IconRenderer = ({ name, className = "w-5 h-5" }) => {
     Shield: <Shield className={className} />,
     FileText: <FileText className={className} />,
     Trash2: <Trash2 className={className} />,
-    Layers: <Layers className={className} />,
-    Lock: <Lock className={className} />,
-    Unlock: <Unlock className={className} />
+    Layers: <Layers className={className} />
   };
   return icons[name] || <Sparkles className={className} />;
 };
@@ -598,7 +594,6 @@ const PdfToolEngine = ({ toolId }) => {
   const [textInput, setTextInput] = useState('');
   const [fontSize, setFontSize] = useState(14);
   const [opacity, setOpacity] = useState(0.5);
-  const [password, setPassword] = useState('');
   const [cropMargin, setCropMargin] = useState(20);
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -740,61 +735,52 @@ const PdfToolEngine = ({ toolId }) => {
       else if (toolId === 'extract-pdf-text') {
         const file = files[0];
         const arrayBuffer = await file.arrayBuffer();
+        let extractedContent = '';
 
-        const pdfjsLib = await import('pdfjs-dist');
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version || '3.11.174'}/pdf.worker.min.js`;
+        try {
+          const pdfjsLib = await import('pdfjs-dist');
+          pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version || '3.11.174'}/pdf.worker.min.js`;
 
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        let fullText = '';
+          const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+          const pdfDoc = await loadingTask.promise;
+          const totalPages = pdfDoc.numPages;
 
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const textContent = await page.getTextContent();
-          const pageText = textContent.items.map((item) => item.str).join(' ');
-          fullText += `--- Page ${i} ---\n${pageText}\n\n`;
+          // Parse specified page range or default to all pages
+          const targetPages = parsePageRange(pages, totalPages);
+
+          if (targetPages.length === 0) {
+            alert(`Please enter valid page numbers between 1 and ${totalPages}.`);
+            setIsProcessing(false);
+            return;
+          }
+
+          for (const pageNum of targetPages) {
+            const page = await pdfDoc.getPage(pageNum);
+            const textContent = await page.getTextContent();
+            const pageStrings = textContent.items.map((item) => item.str);
+            extractedContent += `--- Page ${pageNum} ---\n` + pageStrings.join(' ') + '\n\n';
+          }
+        } catch (pdfErr) {
+          // Fallback parsing reading raw ArrayBuffers directly
+          const rawText = new TextDecoder('latin1').decode(new Uint8Array(arrayBuffer));
+          const matches = rawText.match(/\(([^()]+)\)/g) || [];
+          const textChunks = matches
+            .map((m) => m.slice(1, -1).trim())
+            .filter((s) => s.length > 2 && /^[\x20-\x7E]+$/.test(s));
+
+          extractedContent = textChunks.length > 0 
+            ? textChunks.join('\n') 
+            : '[No extractable text found. This document may be a scanned image or photo.]';
         }
 
-        if (!fullText.trim()) {
-          fullText = `[No selectable text found. This document may be a scanned image or photo.]`;
-        }
-
-        const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' });
+        const blob = new Blob([extractedContent.trim()], { type: 'text/plain;charset=utf-8' });
 
         setDownloads([{
           url: URL.createObjectURL(blob),
           name: `${file.name.replace(/\.pdf$/i, '')}_extracted_text.txt`,
           size: blob.size
         }]);
-        setNotice(`Successfully extracted text from ${pdf.numPages} page(s).`);
-      }
-      else if (['protect-pdf', 'unlock-pdf'].includes(toolId)) {
-        if (toolId === 'protect-pdf' && !password.trim()) {
-          alert('Please enter a password to lock the document.');
-          setIsProcessing(false);
-          return;
-        }
-
-        const file = files[0];
-        const srcDoc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
-        const totalPages = srcDoc.getPageCount();
-
-        const cleanDoc = await PDFDocument.create();
-        const copiedPages = await cleanDoc.copyPages(srcDoc, srcDoc.getPageIndices());
-        copiedPages.forEach((p) => cleanDoc.addPage(p));
-
-        const pdfBytes = await cleanDoc.save({ useObjectStreams: true });
-        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-
-        setDownloads([{
-          url: URL.createObjectURL(blob),
-          name: `${toolId === 'protect-pdf' ? 'protected' : 'unlocked'}_${file.name}`,
-          size: blob.size
-        }]);
-        setNotice(
-          toolId === 'protect-pdf'
-            ? `Protected document output generated (${totalPages} pages).`
-            : `Unlocked copy generated with permissions reset (${totalPages} pages).`
-        );
+        setNotice(`Successfully extracted text content from document.`);
       }
       else if (toolId === 'rotate-pdf') {
         const file = files[0];
@@ -1022,14 +1008,18 @@ const PdfToolEngine = ({ toolId }) => {
           </div>
 
           <div className="space-y-3 bg-gray-50 p-4 rounded-xl text-sm">
-            {['split-pdf', 'extract-pdf-pages', 'delete-pdf-pages', 'reorder-pdf-pages', 'organize-pdf-pages'].includes(toolId) && (
+            {['split-pdf', 'extract-pdf-pages', 'delete-pdf-pages', 'reorder-pdf-pages', 'organize-pdf-pages', 'extract-pdf-text'].includes(toolId) && (
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">
-                  {toolId === 'reorder-pdf-pages' ? 'Desired Page Sequence (e.g., 3, 1, 2)' : 'Page Selection (e.g., 1, 3-5)'}
+                  {toolId === 'reorder-pdf-pages' 
+                    ? 'Desired Page Sequence (e.g., 3, 1, 2)' 
+                    : toolId === 'extract-pdf-text'
+                    ? 'Target Pages to Extract Text From (leave blank for all pages, e.g., 1, 3-5)'
+                    : 'Page Selection (e.g., 1, 3-5)'}
                 </label>
                 <input
                   type="text"
-                  placeholder={toolId === 'reorder-pdf-pages' ? 'e.g. 3, 1, 2' : 'e.g. 1, 3-5'}
+                  placeholder={toolId === 'reorder-pdf-pages' ? 'e.g. 3, 1, 2' : 'e.g. 1, 3-5 (leave empty for all)'}
                   value={pages}
                   onChange={(e) => setPages(e.target.value)}
                   className="w-full border rounded-lg p-2 text-sm bg-white"
@@ -1125,19 +1115,6 @@ const PdfToolEngine = ({ toolId }) => {
                   placeholder="20"
                   value={cropMargin}
                   onChange={(e) => setCropMargin(e.target.value)}
-                  className="w-full border rounded-lg p-2 text-sm bg-white"
-                />
-              </div>
-            )}
-
-            {['protect-pdf', 'unlock-pdf'].includes(toolId) && (
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Document Password</label>
-                <input
-                  type="password"
-                  placeholder="Enter password..."
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
                   className="w-full border rounded-lg p-2 text-sm bg-white"
                 />
               </div>
@@ -1843,7 +1820,7 @@ export default function App() {
                   {[
                     { id: 'all', label: 'All Tools (80)' },
                     { id: 'image', label: 'Image Tools (20)' },
-                    { id: 'pdf', label: 'PDF Tools (20)' },
+                    { id: 'pdf', label: 'PDF Tools (18)' },
                     { id: 'converters', label: 'Unit Converters (20)' },
                     { id: 'calculators', label: 'Calculators (20)' }
                   ].map((cat) => (
