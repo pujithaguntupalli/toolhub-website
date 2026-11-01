@@ -260,6 +260,7 @@ const AdvancedCompressImage = ({ toolId }) => {
   const [width, setWidth] = useState(0);
   const [height, setHeight] = useState(0);
   const [keepAspectRatio, setKeepAspectRatio] = useState(true);
+  const [activeRatio, setActiveRatio] = useState('Original');
   const [percentage, setPercentage] = useState(100);
   const [targetSizeVal, setTargetSizeVal] = useState('');
   const [targetUnit, setTargetUnit] = useState('KB');
@@ -313,6 +314,7 @@ const AdvancedCompressImage = ({ toolId }) => {
       setHeight(img.naturalHeight);
       setCropWidth(img.naturalWidth);
       setCropHeight(img.naturalHeight);
+      setActiveRatio('Original');
       setResult(null);
 
       if (currentTool === 'jpg-to-png') setOutputFormat('image/png');
@@ -327,6 +329,7 @@ const AdvancedCompressImage = ({ toolId }) => {
   const handleWidthChange = (val) => {
     const w = Number(val);
     setWidth(w);
+    setActiveRatio(null);
     if (keepAspectRatio && origInfo.width > 0 && w > 0) {
       setHeight(Math.round(w * (origInfo.height / origInfo.width)));
     }
@@ -335,6 +338,7 @@ const AdvancedCompressImage = ({ toolId }) => {
   const handleHeightChange = (val) => {
     const h = Number(val);
     setHeight(h);
+    setActiveRatio(null);
     if (keepAspectRatio && origInfo.height > 0 && h > 0) {
       setWidth(Math.round(h * (origInfo.width / origInfo.height)));
     }
@@ -342,6 +346,7 @@ const AdvancedCompressImage = ({ toolId }) => {
 
   const applyPresetRatio = (ratio) => {
     if (!origInfo.width) return;
+    setActiveRatio(ratio);
     if (ratio === '1:1') {
       const min = Math.min(origInfo.width, origInfo.height);
       setWidth(min); setHeight(min);
@@ -455,7 +460,6 @@ const AdvancedCompressImage = ({ toolId }) => {
         finalFormat = 'image/jpeg';
       }
 
-      // Step 1: Search quality across FULL spectrum (0.05 to 0.98) to approach targetBytes
       let minQ = 0.05, maxQ = 0.98;
       let bestBlob = await generateBlob(outW, outH, finalFormat, 0.5);
 
@@ -465,14 +469,13 @@ const AdvancedCompressImage = ({ toolId }) => {
 
         if (testBlob.size <= targetBytes) {
           bestBlob = testBlob;
-          minQ = midQ; // Push quality higher to land closer to target limit
+          minQ = midQ;
         } else {
           maxQ = midQ;
         }
       }
       blob = bestBlob;
 
-      // Step 2: Scale dimensions ONLY if 5% quality is still above targetBytes and dimensions aren't explicitly locked
       const explicitDimensionSet = width > 0 && height > 0 && (width !== origInfo.width || height !== origInfo.height);
       if (blob.size > targetBytes && !explicitDimensionSet) {
         let currentScale = 0.95;
@@ -486,7 +489,6 @@ const AdvancedCompressImage = ({ toolId }) => {
         }
       }
     } else {
-      // If target size is not specified, generate directly from slider quality setting
       blob = await generateBlob(outW, outH, finalFormat, quality / 100);
     }
 
@@ -633,16 +635,23 @@ const AdvancedCompressImage = ({ toolId }) => {
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">Aspect Ratio Presets</label>
                   <div className="flex space-x-2">
-                    {['Original', '16:9', '4:3', '1:1'].map((r) => (
-                      <button
-                        key={r}
-                        type="button"
-                        onClick={() => applyPresetRatio(r)}
-                        className="px-3 py-1 bg-white border border-gray-200 rounded-lg text-xs font-medium hover:border-indigo-500 hover:text-indigo-600 transition"
-                      >
-                        {r}
-                      </button>
-                    ))}
+                    {['Original', '16:9', '4:3', '1:1'].map((r) => {
+                      const isActive = activeRatio === r;
+                      return (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => applyPresetRatio(r)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                            isActive
+                              ? 'bg-indigo-600 text-white shadow-sm border border-indigo-600'
+                              : 'bg-white border border-gray-200 text-gray-700 hover:border-indigo-400 hover:text-indigo-600'
+                          }`}
+                        >
+                          {r}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
