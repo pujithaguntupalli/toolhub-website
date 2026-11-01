@@ -270,9 +270,9 @@ const AdvancedCompressImage = ({ toolId }) => {
   const [squareOffset, setSquareOffset] = useState(50); // 0% to 100% position shift
 
   // --- CIRCULAR CROP SPECIFIC STATES ---
-  const [circleScale, setCircleScale] = useState(80); // % scale of circle relative to min dimension
-  const [circleCenterX, setCircleCenterX] = useState(50); // % center offset X
-  const [circleCenterY, setCircleCenterY] = useState(50); // % center offset Y
+  const [circleScale, setCircleScale] = useState(100); // 100% to 300% zoom scale
+  const [circleCenterX, setCircleCenterX] = useState(50); // 0% to 100% horizontal pan offset
+  const [circleCenterY, setCircleCenterY] = useState(50); // 0% to 100% vertical pan offset
 
   useEffect(() => {
     if (toolId === 'resize-percentage') {
@@ -312,6 +312,8 @@ const AdvancedCompressImage = ({ toolId }) => {
   const startMouse = useRef({ x: 0, y: 0 });
   const startBox = useRef({ x: 0, y: 0, w: 0, h: 0 });
   const startPan = useRef({ x: 0, y: 0 });
+  const isCircleDragging = useRef(false);
+  const startCirclePan = useRef({ x: 50, y: 50 });
 
   const currentTool = toolId || 'format-converter';
   const activeInfo = origInfos[activeFileIdx] || { width: 0, height: 0, size: 0, url: '', format: 'image/jpeg' };
@@ -333,7 +335,7 @@ const AdvancedCompressImage = ({ toolId }) => {
       targetW = squareMode.startsWith('pad') ? maxDim : minDim;
       targetH = targetW;
     } else if (currentTool === 'circular-crop') {
-      const circleDiam = Math.round(Math.min(activeInfo.width, activeInfo.height) * (circleScale / 100));
+      const circleDiam = Math.round(Math.min(activeInfo.width, activeInfo.height));
       targetW = circleDiam;
       targetH = circleDiam;
     }
@@ -451,7 +453,23 @@ const AdvancedCompressImage = ({ toolId }) => {
     startPan.current = { ...panPos };
   };
 
+  const startCircleDrag = (e) => {
+    e.preventDefault();
+    isCircleDragging.current = true;
+    startMouse.current = { x: e.clientX, y: e.clientY };
+    startCirclePan.current = { x: circleCenterX, y: circleCenterY };
+  };
+
   const onMouseMove = (e) => {
+    if (isCircleDragging.current) {
+      const dx = e.clientX - startMouse.current.x;
+      const dy = e.clientY - startMouse.current.y;
+      const sensitivity = 0.4;
+      setCircleCenterX(Math.max(0, Math.min(100, Math.round(startCirclePan.current.x - dx * sensitivity))));
+      setCircleCenterY(Math.max(0, Math.min(100, Math.round(startCirclePan.current.y - dy * sensitivity))));
+      return;
+    }
+
     if (!isDragging.current || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const dxPct = ((e.clientX - startMouse.current.x) / rect.width) * 100;
@@ -489,6 +507,7 @@ const AdvancedCompressImage = ({ toolId }) => {
 
   const stopDrag = () => {
     isDragging.current = false;
+    isCircleDragging.current = false;
   };
 
   const executeImageEngine = async () => {
@@ -523,8 +542,8 @@ const AdvancedCompressImage = ({ toolId }) => {
         renderH = renderW;
       } else if (currentTool === 'circular-crop') {
         const baseMin = Math.min(sourceW, sourceH);
-        renderW = Math.round(baseMin * (circleScale / 100));
-        renderH = renderW;
+        renderW = baseMin;
+        renderH = baseMin;
       }
 
       const currentAngle = currentTool === 'rotate-image' ? rotation : currentTool === 'crop-image' ? rotationAngle : 0;
@@ -586,29 +605,30 @@ const AdvancedCompressImage = ({ toolId }) => {
           ctx.drawImage(bitmap, 0, 0, sourceW, sourceH, dx, dy, drawW, drawH);
         }
       } 
-      // --- DEDICATED CIRCULAR CROP LOGIC (FIXED DUAL-AXIS UNLIMITED PANNING) ---
+      // --- DEDICATED CIRCULAR CROP LOGIC (FULLY PANNING & SCALING CANVAS ENGINE) ---
       else if (currentTool === 'circular-crop') {
         const circleDiam = renderW;
         ctx.clearRect(0, 0, circleDiam, circleDiam);
 
-        // Apply Circular Clipping Path
+        // Apply Circular Clipping Mask
         ctx.beginPath();
         ctx.arc(circleDiam / 2, circleDiam / 2, circleDiam / 2, 0, Math.PI * 2);
         ctx.clip();
 
-        // Determine crop box size based on scale slider
-        const baseMin = Math.min(sourceW, sourceH);
-        const cropDim = Math.round(baseMin * (circleScale / 100));
+        // Compute base scaling so image covers the circular frame completely
+        const zoom = circleScale / 100;
+        const baseScale = Math.max(circleDiam / sourceW, circleDiam / sourceH);
+        const drawW = sourceW * baseScale * zoom;
+        const drawH = sourceH * baseScale * zoom;
 
-        // Calculate maximum shift allowance for both axes independently
-        const maxOffsetX = Math.max(0, sourceW - cropDim);
-        const maxOffsetY = Math.max(0, sourceH - cropDim);
+        // Calculate position offset bounds based on circleCenterX & circleCenterY
+        const extraX = drawW - circleDiam;
+        const extraY = drawH - circleDiam;
 
-        // Calculate actual source X and Y top-left anchors
-        const sx = Math.round(maxOffsetX * (circleCenterX / 100));
-        const sy = Math.round(maxOffsetY * (circleCenterY / 100));
+        const dx = -extraX * (circleCenterX / 100);
+        const dy = -extraY * (circleCenterY / 100);
 
-        ctx.drawImage(bitmap, sx, sy, cropDim, cropDim, 0, 0, circleDiam, circleDiam);
+        ctx.drawImage(bitmap, 0, 0, sourceW, sourceH, dx, dy, drawW, drawH);
       } 
       else if (currentTool === 'flip-image' && flipScope === 'selective') {
         ctx.drawImage(bitmap, 0, 0, sourceW, sourceH, 0, 0, renderW, renderH);
@@ -700,7 +720,7 @@ const AdvancedCompressImage = ({ toolId }) => {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6" onMouseMove={onMouseMove} onMouseUp={stopDrag}>
       <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-xl">
         <h3 className="font-bold text-indigo-900 text-base capitalize">
           Active Tool: {currentTool.replace(/-/g, ' ')}
@@ -709,7 +729,7 @@ const AdvancedCompressImage = ({ toolId }) => {
           {currentTool === 'make-square'
             ? 'Crop or pad rectangular photos into a 1:1 square canvas. Choose between Center Crop, White/Black Padding, or Blurred Background.'
             : currentTool === 'circular-crop'
-            ? 'Crop photos into a round avatar badge with transparent outer corners (Exported as PNG).'
+            ? 'Crop photos into a round avatar badge with transparent outer corners. Use Center X / Y sliders or drag the live photo preview to align.'
             : currentTool === 'format-converter'
             ? 'Convert images between JPG, PNG, WEBP, and BMP formats with instant quality settings & live file size estimation.'
             : currentTool === 'flip-image'
@@ -862,19 +882,25 @@ const AdvancedCompressImage = ({ toolId }) => {
             </div>
           )}
 
-          {/* --- CIRCULAR CROP TOOL CONTROLS & UPDATED LIVE PREVIEW --- */}
+          {/* --- CIRCULAR CROP TOOL CONTROLS & FULLY DRAGGABLE INTERACTIVE LIVE PREVIEW --- */}
           {currentTool === 'circular-crop' && (
             <div className="space-y-4">
               <div className="p-4 bg-gray-50 rounded-xl space-y-3 border border-gray-200">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
-                      <span>Circle Size: {circleScale}%</span>
+                      <span>Zoom Scale: {circleScale}%</span>
+                      <button 
+                        onClick={() => setCircleScale(100)} 
+                        className="text-indigo-600 text-[10px] hover:underline"
+                      >
+                        Reset Zoom
+                      </button>
                     </div>
                     <input
                       type="range"
-                      min="20"
-                      max="100"
+                      min="100"
+                      max="300"
                       value={circleScale}
                       onChange={(e) => setCircleScale(Number(e.target.value))}
                       className="w-full accent-indigo-600"
@@ -882,7 +908,7 @@ const AdvancedCompressImage = ({ toolId }) => {
                   </div>
                   <div>
                     <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
-                      <span>Center X: {circleCenterX}%</span>
+                      <span>Center X (Pan Left-Right): {circleCenterX}%</span>
                     </div>
                     <input
                       type="range"
@@ -895,7 +921,7 @@ const AdvancedCompressImage = ({ toolId }) => {
                   </div>
                   <div>
                     <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
-                      <span>Center Y: {circleCenterY}%</span>
+                      <span>Center Y (Pan Up-Down): {circleCenterY}%</span>
                     </div>
                     <input
                       type="range"
@@ -908,19 +934,25 @@ const AdvancedCompressImage = ({ toolId }) => {
                   </div>
                 </div>
 
-                <p className="text-[11px] text-amber-700 bg-amber-50 p-2 rounded border border-amber-200 font-medium">
-                  Note: Outer cut-out corners are converted to alpha transparency. Recommended export format: PNG.
-                </p>
+                <div className="flex items-center justify-between text-xs">
+                  <p className="text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded border border-emerald-200 font-medium flex items-center space-x-1">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Tip: You can drag sliders or click and drag the image inside the circle directly!</span>
+                  </p>
+                  <button
+                    onClick={() => { setCircleScale(100); setCircleCenterX(50); setCircleCenterY(50); }}
+                    className="text-xs text-indigo-600 font-bold hover:underline"
+                  >
+                    Reset Center Position
+                  </button>
+                </div>
               </div>
 
-              {/* Circular Live Preview */}
-              <div className="w-full h-[320px] bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center p-4">
+              {/* Circular Live Preview - Fully Interactive Drag & Axis Responsive */}
+              <div className="w-full h-[320px] bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center p-4 select-none">
                 <div
-                  className="relative rounded-full overflow-hidden border-4 border-indigo-500 shadow-2xl bg-slate-800 flex items-center justify-center"
-                  style={{
-                    width: `${Math.min(260, 260 * (circleScale / 100))}px`,
-                    height: `${Math.min(260, 260 * (circleScale / 100))}px`
-                  }}
+                  onMouseDown={startCircleDrag}
+                  className="relative w-[260px] h-[260px] rounded-full overflow-hidden border-4 border-indigo-500 shadow-2xl bg-slate-800 cursor-grab active:cursor-grabbing flex items-center justify-center"
                 >
                   <img
                     src={activeInfo.url}
@@ -930,10 +962,11 @@ const AdvancedCompressImage = ({ toolId }) => {
                       objectPosition: `${circleCenterX}% ${circleCenterY}%`,
                       width: '100%',
                       height: '100%',
-                      transform: `scale(${100 / Math.max(20, circleScale)})`
+                      transform: `scale(${circleScale / 100})`
                     }}
-                    className="max-w-none transition-all duration-75"
+                    className="max-w-none pointer-events-none transition-transform duration-75"
                   />
+                  <div className="absolute inset-0 rounded-full border border-white/20 pointer-events-none" />
                 </div>
               </div>
             </div>
