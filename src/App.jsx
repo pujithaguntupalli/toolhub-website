@@ -3,7 +3,7 @@ import {
   Search, Calculator, ArrowRightLeft, FileText, Image as ImageIcon, 
   Download, Upload, Trash2, RotateCw, Sparkles, AlertCircle, ChevronRight,
   Layers, Lock, Unlock, ArrowLeft, Star, Clock, Percent, Volume2, Cpu,
-  Database, Flame, HardDrive, Compass, Thermometer, Box, Scale, Shield, Maximize2, Crop, CheckCircle2, Grid, ZoomIn, ZoomOut, RefreshCw, FlipHorizontal, FlipVertical
+  Database, Flame, HardDrive, Compass, Thermometer, Box, Scale, Shield, Maximize2, Crop, CheckCircle2, Grid, ZoomIn, ZoomOut, RefreshCw, FlipHorizontal, FlipVertical, FileCheck
 } from 'lucide-react';
 
 // --- CONVERTER DATA & FORMULAS ---
@@ -257,7 +257,7 @@ const AdvancedCompressImage = ({ toolId }) => {
   const [targetFormat, setTargetFormat] = useState('image/png');
 
   // --- RESIZER STATES ---
-  const [resizeMode, setResizeMode] = useState(toolId === 'resize-percentage' ? '%' : 'px'); // 'px' or '%'
+  const [resizeMode, setResizeMode] = useState(toolId === 'resize-percentage' ? '%' : 'px');
   const [width, setWidth] = useState(0);
   const [height, setHeight] = useState(0);
   const [pctVal, setPctVal] = useState(50);
@@ -265,7 +265,6 @@ const AdvancedCompressImage = ({ toolId }) => {
   const [quality, setQuality] = useState(85);
   const [outputFormat, setOutputFormat] = useState('image/jpeg');
 
-  // Sync default mode on mount or tool change
   useEffect(() => {
     if (toolId === 'resize-percentage') {
       setResizeMode('%');
@@ -289,10 +288,7 @@ const AdvancedCompressImage = ({ toolId }) => {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [panPos, setPanPos] = useState({ x: 0, y: 0 });
 
-  // Interactive Bounding Box percentages [x, y, w, h] relative to container
   const [cropBox, setCropBox] = useState({ x: 10, y: 10, w: 80, h: 80 });
-
-  // Additional Image Tool States
   const [blurRadius, setBlurRadius] = useState(4);
   const [watermarkText, setWatermarkText] = useState('');
 
@@ -309,7 +305,6 @@ const AdvancedCompressImage = ({ toolId }) => {
   const currentTool = toolId || 'format-converter';
   const activeInfo = origInfos[activeFileIdx] || { width: 0, height: 0, size: 0, url: '', format: 'image/jpeg' };
 
-  // Live File Size Estimator
   const estimatedSizeBytes = useMemo(() => {
     if (!activeInfo.size || activeInfo.width === 0 || activeInfo.height === 0) return 0;
     let targetW = width || activeInfo.width;
@@ -344,6 +339,7 @@ const AdvancedCompressImage = ({ toolId }) => {
       const url = URL.createObjectURL(file);
       img.onload = () => {
         loadedInfos[index] = {
+          name: file.name,
           width: img.naturalWidth,
           height: img.naturalHeight,
           size: file.size,
@@ -363,7 +359,16 @@ const AdvancedCompressImage = ({ toolId }) => {
     });
   };
 
-  // Resizer Manual Pixel Controls
+  const removeFile = (idx) => {
+    const updatedFiles = files.filter((_, i) => i !== idx);
+    const updatedInfos = origInfos.filter((_, i) => i !== idx);
+    setFiles(updatedFiles);
+    setOrigInfos(updatedInfos);
+    if (activeFileIdx >= updatedFiles.length) {
+      setActiveFileIdx(Math.max(0, updatedFiles.length - 1));
+    }
+  };
+
   const handleWidthInput = (val) => {
     const w = Number(val);
     setWidth(w);
@@ -380,7 +385,6 @@ const AdvancedCompressImage = ({ toolId }) => {
     }
   };
 
-  // Resizer Preset Shortcuts
   const applyPresetScaling = (percent) => {
     setPctVal(percent);
     if (!activeInfo.width || !activeInfo.height) return;
@@ -390,7 +394,6 @@ const AdvancedCompressImage = ({ toolId }) => {
     setHeight(scaledH);
   };
 
-  // Cropper Aspect Ratio Presets
   const applyCropRatio = (preset) => {
     setCropRatioPreset(preset);
     if (preset === 'Freeform') return;
@@ -419,7 +422,6 @@ const AdvancedCompressImage = ({ toolId }) => {
     });
   };
 
-  // Dragging Handlers for Interactive Box
   const startDrag = (e, type) => {
     e.stopPropagation();
     isDragging.current = true;
@@ -469,7 +471,6 @@ const AdvancedCompressImage = ({ toolId }) => {
     isDragging.current = false;
   };
 
-  // High-Resolution Processing Engine
   const executeImageEngine = async () => {
     if (files.length === 0) return;
     setIsProcessing(true);
@@ -483,7 +484,6 @@ const AdvancedCompressImage = ({ toolId }) => {
       const sourceW = bitmap.width;
       const sourceH = bitmap.height;
 
-      // Calculate Target Canvas Dimensions dynamically per file
       let renderW = sourceW;
       let renderH = sourceH;
 
@@ -501,7 +501,6 @@ const AdvancedCompressImage = ({ toolId }) => {
         renderH = renderW;
       }
 
-      // Rotate dimensions if required by rotation tools
       const currentAngle = currentTool === 'rotate-image' ? rotation : currentTool === 'crop-image' ? rotationAngle : 0;
       const normalizedAngle = ((currentAngle % 360) + 360) % 360;
       if (normalizedAngle === 90 || normalizedAngle === 270) {
@@ -648,27 +647,60 @@ const AdvancedCompressImage = ({ toolId }) => {
         </label>
       </div>
 
+      {/* --- UPLOAD CONFIRMATION STATE BADGE & PREVIEW CARDS --- */}
+      {files.length > 0 && (
+        <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2 text-emerald-800 font-bold text-sm">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              <span>{files.length} Image{files.length > 1 ? 's' : ''} Ready & Loaded</span>
+            </div>
+            <button
+              onClick={() => { setFiles([]); setOrigInfos([]); setBatchResults([]); }}
+              className="text-xs text-red-600 hover:text-red-700 font-semibold flex items-center space-x-1"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Clear Uploads</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {origInfos.map((info, idx) => (
+              <div
+                key={idx}
+                onClick={() => setActiveFileIdx(idx)}
+                className={`p-2.5 rounded-xl border flex items-center space-x-3 cursor-pointer transition ${
+                  activeFileIdx === idx
+                    ? 'bg-white border-indigo-500 shadow-sm ring-2 ring-indigo-200'
+                    : 'bg-white/80 border-emerald-100 hover:border-indigo-300'
+                }`}
+              >
+                <img
+                  src={info.url}
+                  alt={info.name}
+                  className="w-12 h-12 rounded-lg object-cover border border-gray-200 flex-shrink-0"
+                />
+                <div className="flex-grow min-w-0">
+                  <p className="text-xs font-bold text-gray-900 truncate">{info.name}</p>
+                  <p className="text-[11px] text-gray-500">{info.width} × {info.height} px</p>
+                  <span className="inline-block text-[10px] font-semibold text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded mt-0.5">
+                    {formatBytes(info.size)}
+                  </span>
+                </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); removeFile(idx); }}
+                  className="text-gray-400 hover:text-red-500 p-1"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {files.length > 0 && activeInfo && (
         <>
-          {files.length > 1 && (
-            <div className="flex space-x-2 overflow-x-auto pb-2">
-              {files.map((f, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => setActiveFileIdx(idx)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
-                    activeFileIdx === idx
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {f.name}
-                </button>
-              ))}
-            </div>
-          )}
-
           {/* --- FORMAT CONVERTER UNIFIED TOOL CONTROLS --- */}
           {currentTool === 'format-converter' && (
             <div className="p-5 bg-gray-50 rounded-xl space-y-4 border border-gray-200">
@@ -949,7 +981,7 @@ const AdvancedCompressImage = ({ toolId }) => {
             </div>
           )}
 
-          {/* --- RESIZER TOOL CONTROLS (PIXELS & PERCENTAGE) --- */}
+          {/* --- RESIZER TOOL CONTROLS --- */}
           {['resize-image', 'change-dimensions', 'resize-pixels', 'resize-percentage'].includes(currentTool) && (
             <div className="p-5 bg-gray-50 rounded-xl space-y-5">
               <div className="flex items-center justify-between">
@@ -1121,6 +1153,7 @@ const AdvancedCompressImage = ({ toolId }) => {
 
 const PdfToolEngine = ({ toolId }) => {
   const [files, setFiles] = useState([]);
+  const [pdfMeta, setPdfMeta] = useState([]);
   const [pages, setPages] = useState('');
   const [rotationTarget, setRotationTarget] = useState('all');
   const [rotationPages, setRotationPages] = useState('');
@@ -1136,10 +1169,41 @@ const PdfToolEngine = ({ toolId }) => {
 
   const selectedTool = PDF_TOOLS.find((t) => t.id === toolId);
 
-  const handleFileChange = (e) => {
-    setFiles(Array.from(e.target.files));
+  const handleFileChange = async (e) => {
+    const selectedFiles = Array.from(e.target.files);
+    setFiles(selectedFiles);
     setDownloads([]);
     setNotice('');
+
+    const metaList = [];
+    try {
+      const pdfLib = await import('pdf-lib');
+      for (const file of selectedFiles) {
+        if (file.type === 'application/pdf') {
+          const bytes = await file.arrayBuffer();
+          const doc = await pdfLib.PDFDocument.load(bytes, { ignoreEncryption: true });
+          metaList.push({
+            name: file.name,
+            size: file.size,
+            pageCount: doc.getPageCount()
+          });
+        } else {
+          metaList.push({
+            name: file.name,
+            size: file.size,
+            pageCount: 1
+          });
+        }
+      }
+      setPdfMeta(metaList);
+    } catch (err) {
+      setPdfMeta(selectedFiles.map(f => ({ name: f.name, size: f.size, pageCount: 1 })));
+    }
+  };
+
+  const removePdfFile = (idx) => {
+    setFiles(files.filter((_, i) => i !== idx));
+    setPdfMeta(pdfMeta.filter((_, i) => i !== idx));
   };
 
   const processPdfClient = async () => {
@@ -1528,17 +1592,51 @@ const PdfToolEngine = ({ toolId }) => {
         />
       </label>
 
+      {/* --- PDF UPLOAD CONFIRMATION VISUAL FEEDBACK CARDS --- */}
       {files.length > 0 && (
-        <div className="space-y-4">
-          <div className="text-xs text-gray-600 bg-gray-50 p-3 rounded-lg">
-            <strong>Selected ({files.length} file{files.length > 1 ? 's' : ''}):</strong>
-            <ul className="list-disc list-inside mt-1 space-y-0.5">
-              {files.map((f, i) => (
-                <li key={i} className="truncate">{f.name} ({formatBytes(f.size)})</li>
-              ))}
-            </ul>
+        <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2 text-emerald-800 font-bold text-sm">
+              <FileCheck className="w-5 h-5 text-emerald-600" />
+              <span>{files.length} Document / File{files.length > 1 ? 's' : ''} Uploaded Successfully</span>
+            </div>
+            <button
+              onClick={() => { setFiles([]); setPdfMeta([]); setDownloads([]); }}
+              className="text-xs text-red-600 hover:text-red-700 font-semibold flex items-center space-x-1"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Clear</span>
+            </button>
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {pdfMeta.map((meta, i) => (
+              <div key={i} className="p-3 bg-white border border-emerald-100 rounded-xl flex items-center justify-between shadow-xs">
+                <div className="flex items-center space-x-3 truncate">
+                  <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600 flex-shrink-0">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div className="truncate">
+                    <p className="text-xs font-bold text-gray-900 truncate">{meta.name}</p>
+                    <p className="text-[11px] text-gray-500">
+                      {formatBytes(meta.size)} • {meta.pageCount} page{meta.pageCount > 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => removePdfFile(i)}
+                  className="text-gray-400 hover:text-red-500 p-1"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {files.length > 0 && (
+        <div className="space-y-4">
           <div className="space-y-3 bg-gray-50 p-4 rounded-xl text-sm">
             {['split-pdf', 'extract-pdf-pages', 'delete-pdf-pages', 'reorder-pdf-pages', 'organize-pdf-pages', 'extract-pdf-text'].includes(toolId) && (
               <div>
