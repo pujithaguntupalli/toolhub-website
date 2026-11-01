@@ -3,7 +3,7 @@ import {
   Search, Calculator, ArrowRightLeft, FileText, Image as ImageIcon, 
   Download, Upload, Trash2, RotateCw, Sparkles, AlertCircle, ChevronRight,
   Layers, Lock, Unlock, ArrowLeft, Star, Clock, Percent, Volume2, Cpu,
-  Database, Flame, HardDrive, Compass, Thermometer, Box, Scale, Shield, Maximize2, Crop, CheckCircle2, Grid, ZoomIn, ZoomOut, RefreshCw, FlipHorizontal, FlipVertical, FileCheck, Circle
+  Database, Flame, HardDrive, Compass, Thermometer, Box, Scale, Shield, Maximize2, Crop, CheckCircle2, Grid, ZoomIn, ZoomOut, RefreshCw, FlipHorizontal, FlipVertical, FileCheck, Circle, Type, EyeOff
 } from 'lucide-react';
 
 // --- CONVERTER DATA & FORMULAS ---
@@ -85,10 +85,10 @@ export const IMAGE_TOOLS = [
   { id: 'resize-pixels', name: 'Resize by Pixels', description: 'Scale image resolution directly.', keywords: ['pixels', 'resolution'] },
   { id: 'make-square', name: 'Make Image Square', description: 'Crop or frame image into a 1:1 square ratio with crop, pad or blur options.', keywords: ['square', '1:1', 'avatar', 'pad', 'center crop'] },
   { id: 'circular-crop', name: 'Circular Image Crop', description: 'Crop image into a round circular badge with transparent corners.', keywords: ['circle', 'round', 'profile', 'avatar', 'badge'] },
-  { id: 'grayscale-image', name: 'Grayscale Filter', description: 'Convert colored images into black & white.', keywords: ['grayscale', 'black white', 'monochrome'] },
-  { id: 'blur-image', name: 'Blur Image', description: 'Apply privacy blur filter to your images.', keywords: ['blur', 'censor', 'filter'] },
-  { id: 'add-text-image', name: 'Add Text to Image', description: 'Overlay watermark or caption text on photos.', keywords: ['text', 'watermark', 'caption'] },
-  { id: 'remove-metadata', name: 'Remove Metadata', description: 'Strip EXIF privacy details and camera tags.', keywords: ['exif', 'metadata', 'privacy'] }
+  { id: 'grayscale-image', name: 'Grayscale Filter', description: 'Convert colored images into black & white with desaturation and high-contrast threshold controls.', keywords: ['grayscale', 'black white', 'monochrome', 'filter', 'desaturate'] },
+  { id: 'blur-image', name: 'Blur Image', description: 'Apply privacy blur across full canvas or selected regions to censor sensitive information.', keywords: ['blur', 'censor', 'filter', 'privacy', 'obfuscate'] },
+  { id: 'add-text-image', name: 'Add Text to Image', description: 'Overlay customizable text watermarks, captions, or titles with opacity and font size options.', keywords: ['text', 'watermark', 'caption', 'overlay', 'title'] },
+  { id: 'remove-metadata', name: 'Remove Metadata', description: 'Strip EXIF privacy details, camera tags, and GPS coordinates without altering photo quality.', keywords: ['exif', 'metadata', 'privacy', 'gps', 'strip', 'clean'] }
 ];
 
 // --- PDF TOOLS DEFINITION ---
@@ -266,42 +266,43 @@ const AdvancedCompressImage = ({ toolId }) => {
   const [outputFormat, setOutputFormat] = useState(toolId === 'circular-crop' ? 'image/png' : 'image/jpeg');
 
   // --- MAKE SQUARE SPECIFIC STATES ---
-  const [squareMode, setSquareMode] = useState('crop'); // 'crop', 'pad-white', 'pad-black', 'pad-blur'
-  const [squareOffset, setSquareOffset] = useState(50); // 0% to 100% position shift
+  const [squareMode, setSquareMode] = useState('crop'); 
+  const [squareOffset, setSquareOffset] = useState(50); 
 
   // --- CIRCULAR CROP SPECIFIC STATES ---
-  const [circleScale, setCircleScale] = useState(100); // 100% to 300% zoom scale
-  const [circleCenterX, setCircleCenterX] = useState(50); // 0% to 100% horizontal pan offset
-  const [circleCenterY, setCircleCenterY] = useState(50); // 0% to 100% vertical pan offset
+  const [circleScale, setCircleScale] = useState(100); 
+  const [circleCenterX, setCircleCenterX] = useState(50); 
+  const [circleCenterY, setCircleCenterY] = useState(50); 
 
-  useEffect(() => {
-    if (toolId === 'resize-percentage') {
-      setResizeMode('%');
-    } else if (toolId === 'resize-pixels' || toolId === 'change-dimensions') {
-      setResizeMode('px');
-    } else if (toolId === 'circular-crop') {
-      setOutputFormat('image/png');
-    }
-  }, [toolId]);
+  // --- 1. GRAYSCALE FILTER SPECIFIC STATES ---
+  const [grayscaleMode, setGrayscaleMode] = useState('desaturate'); // 'desaturate' or 'threshold'
+  const [grayscaleAmount, setGrayscaleAmount] = useState(100); // 0% to 100%
+  const [bwThreshold, setBwThreshold] = useState(128); // 0 to 255 cutoff for high contrast B&W
 
-  // --- CROPPER & ROTATION STATES ---
+  // --- 2. BLUR IMAGE SPECIFIC STATES ---
+  const [blurMode, setBlurMode] = useState('full'); // 'full' canvas or 'selective' box
+  const [blurRadius, setBlurRadius] = useState(8); // Blur radius in px (1 to 50)
+
+  // --- 3. ADD TEXT TO IMAGE SPECIFIC STATES ---
+  const [watermarkText, setWatermarkText] = useState('SAMPLE WATERMARK');
+  const [textPosition, setTextPosition] = useState('bottom'); // 'top', 'center', 'bottom', 'custom'
+  const [textColor, setTextColor] = useState('#ffffff');
+  const [textSizeRatio, setTextSizeRatio] = useState(40); // Font size slider relative to image width
+  const [textOpacity, setTextOpacity] = useState(90); // 10% to 100%
+
+  // --- CROPPER, FLIP & GENERIC CANVAS STATES ---
   const [cropRatioPreset, setCropRatioPreset] = useState('Freeform');
   const [gridOverlay, setGridOverlay] = useState('thirds');
   const [rotationAngle, setRotationAngle] = useState(0);
   const [rotation, setRotation] = useState(90);
-  
-  // --- FLIP IMAGE DEDICATED STATES ---
   const [flipAxis, setFlipAxis] = useState('horizontal');
   const [flipScope, setFlipScope] = useState('full');
-  
   const [flipHoriz, setFlipHoriz] = useState(false);
   const [flipVert, setFlipVert] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [panPos, setPanPos] = useState({ x: 0, y: 0 });
 
   const [cropBox, setCropBox] = useState({ x: 10, y: 10, w: 80, h: 80 });
-  const [blurRadius, setBlurRadius] = useState(4);
-  const [watermarkText, setWatermarkText] = useState('');
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [batchResults, setBatchResults] = useState([]);
@@ -317,6 +318,16 @@ const AdvancedCompressImage = ({ toolId }) => {
 
   const currentTool = toolId || 'format-converter';
   const activeInfo = origInfos[activeFileIdx] || { width: 0, height: 0, size: 0, url: '', format: 'image/jpeg' };
+
+  useEffect(() => {
+    if (toolId === 'resize-percentage') {
+      setResizeMode('%');
+    } else if (toolId === 'resize-pixels' || toolId === 'change-dimensions') {
+      setResizeMode('px');
+    } else if (toolId === 'circular-crop') {
+      setOutputFormat('image/png');
+    }
+  }, [toolId]);
 
   const estimatedSizeBytes = useMemo(() => {
     if (!activeInfo.size || activeInfo.width === 0 || activeInfo.height === 0) return 0;
@@ -366,6 +377,7 @@ const AdvancedCompressImage = ({ toolId }) => {
           height: img.naturalHeight,
           size: file.size,
           type: file.type || 'image/jpeg',
+          lastModified: new Date(file.lastModified).toLocaleString(),
           url
         };
         if (index === 0) {
@@ -546,14 +558,6 @@ const AdvancedCompressImage = ({ toolId }) => {
         renderH = baseMin;
       }
 
-      const currentAngle = currentTool === 'rotate-image' ? rotation : currentTool === 'crop-image' ? rotationAngle : 0;
-      const normalizedAngle = ((currentAngle % 360) + 360) % 360;
-      if (normalizedAngle === 90 || normalizedAngle === 270) {
-        const temp = renderW;
-        renderW = renderH;
-        renderH = temp;
-      }
-
       const canvas = document.createElement('canvas');
       canvas.width = renderW;
       canvas.height = renderH;
@@ -567,8 +571,102 @@ const AdvancedCompressImage = ({ toolId }) => {
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
 
-      // --- DEDICATED MAKE SQUARE LOGIC ---
-      if (currentTool === 'make-square') {
+      // --- 1. DEDICATED GRAYSCALE FILTER ENGINE ---
+      if (currentTool === 'grayscale-image') {
+        ctx.drawImage(bitmap, 0, 0, renderW, renderH);
+        const imgData = ctx.getImageData(0, 0, renderW, renderH);
+        const data = imgData.data;
+        const factor = grayscaleAmount / 100;
+
+        for (let j = 0; j < data.length; j += 4) {
+          const r = data[j];
+          const g = data[j + 1];
+          const b = data[j + 2];
+          
+          // Perceptual Luminance formula
+          const gray = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+          if (grayscaleMode === 'threshold') {
+            const finalVal = gray >= bwThreshold ? 255 : 0;
+            data[j] = r + (finalVal - r) * factor;
+            data[j + 1] = g + (finalVal - g) * factor;
+            data[j + 2] = b + (finalVal - b) * factor;
+          } else {
+            // Standard Desaturation
+            data[j] = r + (gray - r) * factor;
+            data[j + 1] = g + (gray - g) * factor;
+            data[j + 2] = b + (gray - b) * factor;
+          }
+        }
+        ctx.putImageData(imgData, 0, 0);
+      }
+      // --- 2. DEDICATED BLUR IMAGE ENGINE ---
+      else if (currentTool === 'blur-image') {
+        if (blurMode === 'full') {
+          ctx.save();
+          ctx.filter = `blur(${blurRadius}px)`;
+          ctx.drawImage(bitmap, 0, 0, renderW, renderH);
+          ctx.restore();
+        } else {
+          // Selective Region Blur
+          ctx.drawImage(bitmap, 0, 0, renderW, renderH);
+          const bx = Math.round((renderW * cropBox.x) / 100);
+          const by = Math.round((renderH * cropBox.y) / 100);
+          const bw = Math.round((renderW * cropBox.w) / 100);
+          const bh = Math.round((renderH * cropBox.h) / 100);
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(bx, by, bw, bh);
+          ctx.clip();
+          ctx.filter = `blur(${blurRadius}px)`;
+          ctx.drawImage(bitmap, 0, 0, renderW, renderH);
+          ctx.restore();
+        }
+      }
+      // --- 3. DEDICATED ADD TEXT TO IMAGE ENGINE ---
+      else if (currentTool === 'add-text-image') {
+        ctx.drawImage(bitmap, 0, 0, renderW, renderH);
+
+        if (watermarkText.trim()) {
+          const calculatedFontSize = Math.max(16, Math.round((renderW * textSizeRatio) / 500));
+          ctx.font = `bold ${calculatedFontSize}px system-ui, sans-serif`;
+          ctx.textAlign = textPosition === 'custom' ? 'left' : 'center';
+          ctx.textBaseline = 'middle';
+
+          let tx = renderW / 2;
+          let ty = renderH / 2;
+
+          if (textPosition === 'top') {
+            ty = calculatedFontSize * 1.5;
+          } else if (textPosition === 'bottom') {
+            ty = renderH - calculatedFontSize * 1.5;
+          } else if (textPosition === 'custom') {
+            tx = Math.round((renderW * cropBox.x) / 100);
+            ty = Math.round((renderH * cropBox.y) / 100);
+          }
+
+          ctx.save();
+          ctx.globalAlpha = textOpacity / 100;
+
+          // Soft Text Drop Shadow
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+          ctx.shadowBlur = 6;
+          ctx.shadowOffsetX = 2;
+          ctx.shadowOffsetY = 2;
+
+          ctx.fillStyle = textColor;
+          ctx.fillText(watermarkText, tx, ty);
+          ctx.restore();
+        }
+      }
+      // --- 4. DEDICATED REMOVE METADATA ENGINE ---
+      else if (currentTool === 'remove-metadata') {
+        // Redrawing the bitmap onto a fresh clean canvas strips all EXIF headers & GPS tags
+        ctx.drawImage(bitmap, 0, 0, renderW, renderH);
+      }
+      // --- OTHER TOOLS (MAKE SQUARE, CIRCULAR CROP, FLIP, CROP, ROTATE, etc.) ---
+      else if (currentTool === 'make-square') {
         const side = renderW;
 
         if (squareMode === 'crop') {
@@ -605,23 +703,19 @@ const AdvancedCompressImage = ({ toolId }) => {
           ctx.drawImage(bitmap, 0, 0, sourceW, sourceH, dx, dy, drawW, drawH);
         }
       } 
-      // --- DEDICATED CIRCULAR CROP LOGIC (FULLY PANNING & SCALING CANVAS ENGINE) ---
       else if (currentTool === 'circular-crop') {
         const circleDiam = renderW;
         ctx.clearRect(0, 0, circleDiam, circleDiam);
 
-        // Apply Circular Clipping Mask
         ctx.beginPath();
         ctx.arc(circleDiam / 2, circleDiam / 2, circleDiam / 2, 0, Math.PI * 2);
         ctx.clip();
 
-        // Compute base scaling so image covers the circular frame completely
         const zoom = circleScale / 100;
         const baseScale = Math.max(circleDiam / sourceW, circleDiam / sourceH);
         const drawW = sourceW * baseScale * zoom;
         const drawH = sourceH * baseScale * zoom;
 
-        // Calculate position offset bounds based on circleCenterX & circleCenterY
         const extraX = drawW - circleDiam;
         const extraY = drawH - circleDiam;
 
@@ -653,8 +747,8 @@ const AdvancedCompressImage = ({ toolId }) => {
         ctx.drawImage(bitmap, srcX, srcY, srcW, srcH, -srcW / 2, -srcH / 2, srcW, srcH);
         ctx.restore();
       } else {
-        if (currentTool === 'grayscale-image') ctx.filter = 'grayscale(1)';
-        if (currentTool === 'blur-image') ctx.filter = `blur(${blurRadius}px)`;
+        const currentAngle = currentTool === 'rotate-image' ? rotation : currentTool === 'crop-image' ? rotationAngle : 0;
+        const normalizedAngle = ((currentAngle % 360) + 360) % 360;
 
         ctx.save();
         ctx.translate(renderW / 2, renderH / 2);
@@ -680,19 +774,6 @@ const AdvancedCompressImage = ({ toolId }) => {
           ctx.drawImage(bitmap, -drawW / 2, -drawH / 2, drawW, drawH);
         }
         ctx.restore();
-        ctx.filter = 'none';
-      }
-
-      if (currentTool === 'add-text-image' && watermarkText) {
-        const fontSize = Math.max(16, Math.round(renderW / 18));
-        ctx.font = `600 ${fontSize}px system-ui, sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-        ctx.lineWidth = 3;
-        ctx.fillStyle = '#ffffff';
-        ctx.strokeText(watermarkText, renderW / 2, renderH - fontSize * 0.7);
-        ctx.fillText(watermarkText, renderW / 2, renderH - fontSize * 0.7);
       }
 
       const blob = await new Promise((res) => canvas.toBlob(res, effectiveFormat, quality / 100));
@@ -726,18 +807,14 @@ const AdvancedCompressImage = ({ toolId }) => {
           Active Tool: {currentTool.replace(/-/g, ' ')}
         </h3>
         <p className="text-xs text-indigo-700 mt-0.5">
-          {currentTool === 'make-square'
-            ? 'Crop or pad rectangular photos into a 1:1 square canvas. Choose between Center Crop, White/Black Padding, or Blurred Background.'
-            : currentTool === 'circular-crop'
-            ? 'Crop photos into a round avatar badge with transparent outer corners. Use Center X / Y sliders or drag the live photo preview to align.'
-            : currentTool === 'format-converter'
-            ? 'Convert images between JPG, PNG, WEBP, and BMP formats with instant quality settings & live file size estimation.'
-            : currentTool === 'flip-image'
-            ? 'Horizontal (left-right), Vertical (top-bottom), and Dual-Axis 180° inversion flipping. Supports selective layer flipping and live preview.'
-            : ['resize-image', 'change-dimensions', 'resize-pixels', 'resize-percentage'].includes(currentTool)
-            ? 'Batch scale dimensions via manual px inputs, percentage shortcuts, aspect ratio locking & real-time file size estimation.'
-            : currentTool === 'crop-image'
-            ? 'Interactive cropper featuring Rule-of-Thirds & Golden Ratio overlays, zoom, pan controls, continuous rotation & high-resolution rendering.'
+          {currentTool === 'grayscale-image'
+            ? 'Convert color photos into desaturated black & white or high-contrast threshold artworks.'
+            : currentTool === 'blur-image'
+            ? 'Apply smooth privacy Gaussian blur across full canvas or draggable selective regions.'
+            : currentTool === 'add-text-image'
+            ? 'Overlay customizable text captions, titles, or watermarks with positioning and opacity controls.'
+            : currentTool === 'remove-metadata'
+            ? 'Strip all EXIF data, camera details, and GPS location tags to secure photo privacy before sharing.'
             : 'Client-side image processing suite.'}
         </p>
       </div>
@@ -750,7 +827,6 @@ const AdvancedCompressImage = ({ toolId }) => {
         </label>
       </div>
 
-      {/* --- UPLOAD CONFIRMATION STATE BADGE & PREVIEW CARDS --- */}
       {files.length > 0 && (
         <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-3">
           <div className="flex items-center justify-between">
@@ -804,547 +880,343 @@ const AdvancedCompressImage = ({ toolId }) => {
 
       {files.length > 0 && activeInfo && (
         <>
-          {/* --- MAKE IMAGE SQUARE TOOL CONTROLS & PREVIEW --- */}
-          {currentTool === 'make-square' && (
+          {/* --- 1. DEDICATED GRAYSCALE FILTER TOOL --- */}
+          {currentTool === 'grayscale-image' && (
             <div className="space-y-4">
-              <div className="p-4 bg-gray-50 rounded-xl space-y-3 border border-gray-200">
-                <label className="block text-xs font-semibold text-gray-600">Square Formatting Strategy</label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {[
-                    { id: 'crop', label: '1:1 Center Crop' },
-                    { id: 'pad-white', label: 'Pad (White Frame)' },
-                    { id: 'pad-black', label: 'Pad (Black Frame)' },
-                    { id: 'pad-blur', label: 'Pad (Blurred Background)' }
-                  ].map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => setSquareMode(m.id)}
-                      className={`p-2.5 rounded-lg text-xs font-bold transition border ${
-                        squareMode === m.id
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow'
-                          : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
-                      }`}
-                    >
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
+              <div className="p-4 bg-gray-50 rounded-xl space-y-4 border border-gray-200">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Grayscale Mode</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setGrayscaleMode('desaturate')}
+                        className={`p-2.5 rounded-lg text-xs font-bold border transition ${
+                          grayscaleMode === 'desaturate' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
+                        }`}
+                      >
+                        Smooth Desaturate
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setGrayscaleMode('threshold')}
+                        className={`p-2.5 rounded-lg text-xs font-bold border transition ${
+                          grayscaleMode === 'threshold' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
+                        }`}
+                      >
+                        High-Contrast B&W
+                      </button>
+                    </div>
+                  </div>
 
-                {squareMode === 'crop' && (
-                  <div className="pt-2">
+                  <div>
                     <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
-                      <span>Crop Position Offset: {squareOffset}%</span>
-                      <span className="text-gray-400">
-                        {activeInfo.width > activeInfo.height ? 'Shift Horizontal' : 'Shift Vertical'}
-                      </span>
+                      <span>Effect Intensity: {grayscaleAmount}%</span>
                     </div>
                     <input
                       type="range"
                       min="0"
                       max="100"
-                      value={squareOffset}
-                      onChange={(e) => setSquareOffset(Number(e.target.value))}
+                      value={grayscaleAmount}
+                      onChange={(e) => setGrayscaleAmount(Number(e.target.value))}
+                      className="w-full accent-indigo-600"
+                    />
+                  </div>
+                </div>
+
+                {grayscaleMode === 'threshold' && (
+                  <div className="pt-2 border-t border-gray-200">
+                    <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
+                      <span>B&W Cutoff Threshold: {bwThreshold}</span>
+                      <span className="text-gray-400">Lower = Darker, Higher = Lighter</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="255"
+                      value={bwThreshold}
+                      onChange={(e) => setBwThreshold(Number(e.target.value))}
                       className="w-full accent-indigo-600"
                     />
                   </div>
                 )}
               </div>
 
-              {/* Square Live Preview */}
+              {/* Grayscale Preview */}
               <div className="w-full h-[320px] bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center p-4">
-                <div
-                  className="relative aspect-square max-h-full overflow-hidden rounded-xl border-2 border-dashed border-indigo-400 flex items-center justify-center"
+                <img
+                  src={activeInfo.url}
+                  alt="Grayscale Live Preview"
                   style={{
-                    backgroundColor: squareMode === 'pad-white' ? '#fff' : squareMode === 'pad-black' ? '#000' : '#1e293b'
+                    filter: grayscaleMode === 'desaturate'
+                      ? `grayscale(${grayscaleAmount}%)`
+                      : `contrast(200%) grayscale(${grayscaleAmount}%)`
                   }}
-                >
-                  {squareMode === 'pad-blur' && (
-                    <img
-                      src={activeInfo.url}
-                      alt="Blur BG"
-                      className="absolute inset-0 w-full h-full object-cover filter blur-md scale-110 opacity-70"
-                    />
-                  )}
-                  <img
-                    src={activeInfo.url}
-                    alt="Square Target"
-                    style={{
-                      objectFit: squareMode === 'crop' ? 'cover' : 'contain',
-                      objectPosition: squareMode === 'crop'
-                        ? activeInfo.width > activeInfo.height ? `${squareOffset}% 50%` : `50% ${squareOffset}%`
-                        : 'center'
-                    }}
-                    className="relative z-10 max-h-full max-w-full"
-                  />
-                </div>
+                  className="max-h-full max-w-full object-contain rounded-lg"
+                />
               </div>
             </div>
           )}
 
-          {/* --- CIRCULAR CROP TOOL CONTROLS & FULLY DRAGGABLE INTERACTIVE LIVE PREVIEW --- */}
-          {currentTool === 'circular-crop' && (
+          {/* --- 2. DEDICATED BLUR IMAGE TOOL --- */}
+          {currentTool === 'blur-image' && (
             <div className="space-y-4">
-              <div className="p-4 bg-gray-50 rounded-xl space-y-3 border border-gray-200">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
-                      <span>Zoom Scale: {circleScale}%</span>
-                      <button 
-                        onClick={() => setCircleScale(100)} 
-                        className="text-indigo-600 text-[10px] hover:underline"
-                      >
-                        Reset Zoom
-                      </button>
-                    </div>
-                    <input
-                      type="range"
-                      min="100"
-                      max="300"
-                      value={circleScale}
-                      onChange={(e) => setCircleScale(Number(e.target.value))}
-                      className="w-full accent-indigo-600"
-                    />
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
-                      <span>Center X (Pan Left-Right): {circleCenterX}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={circleCenterX}
-                      onChange={(e) => setCircleCenterX(Number(e.target.value))}
-                      className="w-full accent-indigo-600"
-                    />
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
-                      <span>Center Y (Pan Up-Down): {circleCenterY}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={circleCenterY}
-                      onChange={(e) => setCircleCenterY(Number(e.target.value))}
-                      className="w-full accent-indigo-600"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-xs">
-                  <p className="text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded border border-emerald-200 font-medium flex items-center space-x-1">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Tip: You can drag sliders or click and drag the image inside the circle directly!</span>
-                  </p>
-                  <button
-                    onClick={() => { setCircleScale(100); setCircleCenterX(50); setCircleCenterY(50); }}
-                    className="text-xs text-indigo-600 font-bold hover:underline"
-                  >
-                    Reset Center Position
-                  </button>
-                </div>
-              </div>
-
-              {/* Circular Live Preview - Fully Interactive Drag & Axis Responsive */}
-              <div className="w-full h-[320px] bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center p-4 select-none">
-                <div
-                  onMouseDown={startCircleDrag}
-                  className="relative w-[260px] h-[260px] rounded-full overflow-hidden border-4 border-indigo-500 shadow-2xl bg-slate-800 cursor-grab active:cursor-grabbing flex items-center justify-center"
-                >
-                  <img
-                    src={activeInfo.url}
-                    alt="Circle Preview Target"
-                    style={{
-                      objectFit: 'cover',
-                      objectPosition: `${circleCenterX}% ${circleCenterY}%`,
-                      width: '100%',
-                      height: '100%',
-                      transform: `scale(${circleScale / 100})`
-                    }}
-                    className="max-w-none pointer-events-none transition-transform duration-75"
-                  />
-                  <div className="absolute inset-0 rounded-full border border-white/20 pointer-events-none" />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* --- FORMAT CONVERTER UNIFIED TOOL CONTROLS --- */}
-          {currentTool === 'format-converter' && (
-            <div className="p-5 bg-gray-50 rounded-xl space-y-4 border border-gray-200">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Source Format (Detected)</label>
-                  <div className="p-2.5 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-700 uppercase">
-                    {activeInfo.type ? activeInfo.type.replace('image/', '') : 'JPG / PNG'}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Target Export Format</label>
-                  <select
-                    value={targetFormat}
-                    onChange={(e) => setTargetFormat(e.target.value)}
-                    className="w-full border border-indigo-300 rounded-lg p-2.5 text-sm bg-white font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500 outline-none"
-                  >
-                    <option value="image/png">PNG (.png)</option>
-                    <option value="image/jpeg">JPG / JPEG (.jpg)</option>
-                    <option value="image/webp">WEBP (.webp)</option>
-                    <option value="image/bmp">BMP (.bmp)</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* --- FLIP IMAGE TOOL INTERACTIVE CANVAS & CONTROLS --- */}
-          {currentTool === 'flip-image' && (
-            <div className="space-y-5">
               <div className="p-4 bg-gray-50 rounded-xl space-y-4 border border-gray-200">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-2">Flip Axis Target</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setFlipAxis('horizontal')}
-                        className={`flex flex-col items-center justify-center p-2.5 rounded-lg text-xs font-bold transition border ${
-                          flipAxis === 'horizontal' ? 'bg-indigo-600 text-white border-indigo-600 shadow' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
-                        }`}
-                      >
-                        <FlipHorizontal className="w-4 h-4 mb-1" />
-                        <span>Horizontal</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFlipAxis('vertical')}
-                        className={`flex flex-col items-center justify-center p-2.5 rounded-lg text-xs font-bold transition border ${
-                          flipAxis === 'vertical' ? 'bg-indigo-600 text-white border-indigo-600 shadow' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
-                        }`}
-                      >
-                        <FlipVertical className="w-4 h-4 mb-1" />
-                        <span>Vertical</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFlipAxis('dual')}
-                        className={`flex flex-col items-center justify-center p-2.5 rounded-lg text-xs font-bold transition border ${
-                          flipAxis === 'dual' ? 'bg-indigo-600 text-white border-indigo-600 shadow' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
-                        }`}
-                      >
-                        <RefreshCw className="w-4 h-4 mb-1" />
-                        <span>Dual-Axis (180°)</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-2">Flipping Scope</label>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Blur Target Scope</label>
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={() => setFlipScope('full')}
-                        className={`py-2.5 px-3 rounded-lg text-xs font-bold transition border ${
-                          flipScope === 'full' ? 'bg-indigo-600 text-white border-indigo-600 shadow' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
+                        onClick={() => setBlurMode('full')}
+                        className={`p-2.5 rounded-lg text-xs font-bold border transition ${
+                          blurMode === 'full' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
                         }`}
                       >
-                        Full Background Canvas
+                        Full Image Blur
                       </button>
                       <button
                         type="button"
-                        onClick={() => setFlipScope('selective')}
-                        className={`py-2.5 px-3 rounded-lg text-xs font-bold transition border ${
-                          flipScope === 'selective' ? 'bg-indigo-600 text-white border-indigo-600 shadow' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
+                        onClick={() => setBlurMode('selective')}
+                        className={`p-2.5 rounded-lg text-xs font-bold border transition ${
+                          blurMode === 'selective' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
                         }`}
                       >
-                        Selective / Layer Region
+                        Selective Region Box
                       </button>
                     </div>
                   </div>
-                </div>
 
-                <div className="text-xs text-indigo-700 bg-indigo-50/80 p-2.5 rounded-lg font-medium border border-indigo-100">
-                  {flipScope === 'full'
-                    ? `Mode: Full Canvas Image ${flipAxis === 'horizontal' ? 'Horizontal (Mirror Left-Right)' : flipAxis === 'vertical' ? 'Vertical (Mirror Top-Bottom)' : 'Dual-Axis (180° Inversion)'}`
-                    : `Mode: Selective Layer Region. Drag handle on preview below to select area to flip.`}
+                  <div>
+                    <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
+                      <span>Blur Radius: {blurRadius}px</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="40"
+                      value={blurRadius}
+                      onChange={(e) => setBlurRadius(Number(e.target.value))}
+                      className="w-full accent-indigo-600"
+                    />
+                  </div>
                 </div>
               </div>
 
+              {/* Blur Live Canvas Viewport */}
               <div
                 ref={containerRef}
                 onMouseMove={onMouseMove}
                 onMouseUp={stopDrag}
                 onMouseLeave={stopDrag}
-                className="relative w-full h-[360px] bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center select-none"
+                className="relative w-full h-[340px] bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center select-none"
+              >
+                <img
+                  src={activeInfo.url}
+                  alt="Blur Target Preview"
+                  style={{
+                    filter: blurMode === 'full' ? `blur(${blurRadius}px)` : 'none'
+                  }}
+                  className="max-h-full max-w-full object-contain"
+                />
+
+                {blurMode === 'selective' && (
+                  <div
+                    style={{
+                      left: `${cropBox.x}%`,
+                      top: `${cropBox.y}%`,
+                      width: `${cropBox.w}%`,
+                      height: `${cropBox.h}%`,
+                      backdropFilter: `blur(${blurRadius}px)`
+                    }}
+                    onMouseDown={(e) => startDrag(e, 'move')}
+                    className="absolute border-2 border-dashed border-red-400 bg-red-400/20 cursor-move"
+                  >
+                    <div className="absolute top-1 left-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center space-x-1 shadow">
+                      <EyeOff className="w-3 h-3" />
+                      <span>Selective Blur Zone</span>
+                    </div>
+                    <div onMouseDown={(e) => startDrag(e, 'nw')} className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 bg-red-600 border border-white rounded-full cursor-nwse-resize" />
+                    <div onMouseDown={(e) => startDrag(e, 'ne')} className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-red-600 border border-white rounded-full cursor-nesw-resize" />
+                    <div onMouseDown={(e) => startDrag(e, 'sw')} className="absolute -bottom-1.5 -left-1.5 w-3.5 h-3.5 bg-red-600 border border-white rounded-full cursor-nesw-resize" />
+                    <div onMouseDown={(e) => startDrag(e, 'se')} className="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 bg-red-600 border border-white rounded-full cursor-nwse-resize" />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* --- 3. DEDICATED ADD TEXT TO IMAGE TOOL --- */}
+          {currentTool === 'add-text-image' && (
+            <div className="space-y-4">
+              <div className="p-4 bg-gray-50 rounded-xl space-y-4 border border-gray-200">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Watermark / Caption Text</label>
+                    <input
+                      type="text"
+                      value={watermarkText}
+                      onChange={(e) => setWatermarkText(e.target.value)}
+                      placeholder="Type custom text..."
+                      className="w-full border rounded-lg p-2.5 text-sm bg-white font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Text Alignment Position</label>
+                    <select
+                      value={textPosition}
+                      onChange={(e) => setTextPosition(e.target.value)}
+                      className="w-full border rounded-lg p-2.5 text-sm bg-white font-semibold"
+                    >
+                      <option value="bottom">Bottom Caption</option>
+                      <option value="center">Center Overlay</option>
+                      <option value="top">Top Header</option>
+                      <option value="custom">Custom Position (Drag Box)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3 pt-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Text Color</label>
+                    <input
+                      type="color"
+                      value={textColor}
+                      onChange={(e) => setTextColor(e.target.value)}
+                      className="w-full h-9 p-0.5 border rounded-lg cursor-pointer bg-white"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
+                      <span>Font Size</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="15"
+                      max="100"
+                      value={textSizeRatio}
+                      onChange={(e) => setTextSizeRatio(Number(e.target.value))}
+                      className="w-full accent-indigo-600"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
+                      <span>Opacity: {textOpacity}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="10"
+                      max="100"
+                      value={textOpacity}
+                      onChange={(e) => setTextOpacity(Number(e.target.value))}
+                      className="w-full accent-indigo-600"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Text Overlay Preview */}
+              <div
+                ref={containerRef}
+                onMouseMove={onMouseMove}
+                onMouseUp={stopDrag}
+                onMouseLeave={stopDrag}
+                className="relative w-full h-[340px] bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center p-4 select-none"
               >
                 <div className="relative max-h-full max-w-full flex items-center justify-center">
                   <img
                     src={activeInfo.url}
-                    alt="Flip Live Preview Target"
-                    style={{
-                      transform: flipScope === 'full' 
-                        ? `scale(${flipAxis === 'horizontal' || flipAxis === 'dual' ? -1 : 1}, ${flipAxis === 'vertical' || flipAxis === 'dual' ? -1 : 1})`
-                        : 'none',
-                      maxHeight: '340px',
-                      maxWidth: '100%',
-                      objectFit: 'contain'
-                    }}
-                    className="pointer-events-none transition-transform duration-150"
+                    alt="Text Overlay Preview"
+                    className="max-h-[320px] max-w-full object-contain"
                   />
 
-                  {flipScope === 'selective' && (
+                  {textPosition === 'custom' ? (
                     <div
                       style={{
                         left: `${cropBox.x}%`,
-                        top: `${cropBox.y}%`,
-                        width: `${cropBox.w}%`,
-                        height: `${cropBox.h}%`
+                        top: `${cropBox.y}%`
                       }}
                       onMouseDown={(e) => startDrag(e, 'move')}
-                      className="absolute border-2 border-dashed border-amber-400 bg-amber-400/20 cursor-move"
+                      className="absolute cursor-move bg-black/40 border border-white/50 p-2 rounded shadow"
                     >
-                      <div className="absolute top-1 left-1 bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow">
-                        Selective Layer Region
-                      </div>
-                      <div onMouseDown={(e) => startDrag(e, 'nw')} className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 bg-amber-500 border border-white rounded-full cursor-nwse-resize" />
-                      <div onMouseDown={(e) => startDrag(e, 'ne')} className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-amber-500 border border-white rounded-full cursor-nesw-resize" />
-                      <div onMouseDown={(e) => startDrag(e, 'sw')} className="absolute -bottom-1.5 -left-1.5 w-3.5 h-3.5 bg-amber-500 border border-white rounded-full cursor-nesw-resize" />
-                      <div onMouseDown={(e) => startDrag(e, 'se')} className="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 bg-amber-500 border border-white rounded-full cursor-nwse-resize" />
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* --- CROPPER TOOL INTERACTIVE CANVAS & CONTROLS --- */}
-          {currentTool === 'crop-image' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between bg-gray-100 p-2.5 rounded-xl text-xs font-semibold">
-                <div className="flex items-center space-x-2">
-                  <button onClick={() => setZoomLevel((z) => Math.min(3, z + 0.2))} className="p-1.5 bg-white rounded border hover:bg-gray-50"><ZoomIn className="w-4 h-4" /></button>
-                  <button onClick={() => setZoomLevel((z) => Math.max(0.5, z - 0.2))} className="p-1.5 bg-white rounded border hover:bg-gray-50"><ZoomOut className="w-4 h-4" /></button>
-                  <button onClick={() => { setZoomLevel(1); setPanPos({ x: 0, y: 0 }); }} className="p-1.5 bg-white rounded border hover:bg-gray-50"><RefreshCw className="w-4 h-4" /></button>
-                  <span className="text-gray-500">Zoom: {Math.round(zoomLevel * 100)}%</span>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <button onClick={() => setFlipHoriz(!flipHoriz)} className={`px-2 py-1 rounded border ${flipHoriz ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700'}`}>Flip H</button>
-                  <button onClick={() => setFlipVert(!flipVert)} className={`px-2 py-1 rounded border ${flipVert ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700'}`}>Flip V</button>
-                  <select value={gridOverlay} onChange={(e) => setGridOverlay(e.target.value)} className="bg-white border rounded px-2 py-1 text-xs font-semibold">
-                    <option value="none">No Grid</option>
-                    <option value="thirds">Rule of Thirds</option>
-                    <option value="golden">Golden Ratio</option>
-                  </select>
-                </div>
-              </div>
-
-              <div
-                ref={containerRef}
-                onMouseDown={(e) => startDrag(e, 'pan')}
-                onMouseMove={onMouseMove}
-                onMouseUp={stopDrag}
-                onMouseLeave={stopDrag}
-                className="relative w-full h-[380px] bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing select-none"
-              >
-                <img
-                  src={activeInfo.url}
-                  alt="Crop Target"
-                  style={{
-                    transform: `translate(${panPos.x}px, ${panPos.y}px) scale(${zoomLevel}) rotate(${rotationAngle}deg) scale(${flipHoriz ? -1 : 1}, ${flipVert ? -1 : 1})`,
-                    maxHeight: '100%',
-                    maxWidth: '100%',
-                    objectFit: 'contain'
-                  }}
-                  className="pointer-events-none transition-transform duration-75"
-                />
-
-                <div
-                  style={{
-                    left: `${cropBox.x}%`,
-                    top: `${cropBox.y}%`,
-                    width: `${cropBox.w}%`,
-                    height: `${cropBox.h}%`
-                  }}
-                  onMouseDown={(e) => startDrag(e, 'move')}
-                  className="absolute border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] cursor-move"
-                >
-                  {gridOverlay === 'thirds' && (
-                    <div className="w-full h-full grid grid-cols-3 grid-rows-3 pointer-events-none border border-white/30">
-                      {[...Array(9)].map((_, i) => (
-                        <div key={i} className="border border-white/20" />
-                      ))}
-                    </div>
-                  )}
-
-                  {gridOverlay === 'golden' && (
-                    <div className="w-full h-full relative pointer-events-none border border-white/30">
-                      <div className="absolute left-[38.2%] top-0 bottom-0 border-r border-white/30" />
-                      <div className="absolute right-[38.2%] top-0 bottom-0 border-r border-white/30" />
-                      <div className="absolute top-[38.2%] left-0 right-0 border-b border-white/30" />
-                      <div className="absolute bottom-[38.2%] left-0 right-0 border-b border-white/30" />
-                    </div>
-                  )}
-
-                  <div onMouseDown={(e) => startDrag(e, 'nw')} className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 bg-indigo-600 border border-white rounded-full cursor-nwse-resize" />
-                  <div onMouseDown={(e) => startDrag(e, 'ne')} className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-indigo-600 border border-white rounded-full cursor-nesw-resize" />
-                  <div onMouseDown={(e) => startDrag(e, 'sw')} className="absolute -bottom-1.5 -left-1.5 w-3.5 h-3.5 bg-indigo-600 border border-white rounded-full cursor-nesw-resize" />
-                  <div onMouseDown={(e) => startDrag(e, 'se')} className="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 bg-indigo-600 border border-white rounded-full cursor-nwse-resize" />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs font-semibold text-gray-700 mb-1">
-                  <span>Continuous Angle: {rotationAngle}°</span>
-                  <button onClick={() => setRotationAngle(0)} className="text-indigo-600 hover:underline">Reset Angle</button>
-                </div>
-                <input
-                  type="range"
-                  min="-180"
-                  max="180"
-                  value={rotationAngle}
-                  onChange={(e) => setRotationAngle(Number(e.target.value))}
-                  className="w-full accent-indigo-600"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-semibold text-gray-600">Aspect Ratio Presets</label>
-                  <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
-                    Selection: {Math.round((activeInfo.width * cropBox.w) / 100)} × {Math.round((activeInfo.height * cropBox.h) / 100)} px
-                  </span>
-                </div>
-                <div className="flex space-x-2">
-                  {['Freeform', '1:1', '16:9', '9:16', '4:3', '4:5'].map((r) => (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => applyCropRatio(r)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                        cropRatioPreset === r ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      {r}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* --- ROTATE IMAGE DEDICATED CONTROL --- */}
-          {currentTool === 'rotate-image' && (
-            <div className="p-5 bg-gray-50 rounded-xl space-y-4">
-              <label className="block text-xs font-semibold text-gray-600">Rotation Angle</label>
-              <select
-                value={rotation}
-                onChange={(e) => setRotation(Number(e.target.value))}
-                className="w-full border rounded-lg p-2.5 text-sm bg-white font-semibold"
-              >
-                <option value={90}>90° Clockwise</option>
-                <option value={180}>180° Turn</option>
-                <option value={270}>270° Counter-Clockwise</option>
-              </select>
-            </div>
-          )}
-
-          {/* --- RESIZER TOOL CONTROLS --- */}
-          {['resize-image', 'change-dimensions', 'resize-pixels', 'resize-percentage'].includes(currentTool) && (
-            <div className="p-5 bg-gray-50 rounded-xl space-y-5">
-              <div className="flex items-center justify-between">
-                <div className="flex space-x-2 bg-gray-200 p-1 rounded-lg text-xs font-bold">
-                  {currentTool !== 'resize-percentage' && (
-                    <button
-                      onClick={() => setResizeMode('px')}
-                      className={`px-3 py-1 rounded-md transition ${resizeMode === 'px' ? 'bg-white shadow text-indigo-600' : 'text-gray-600'}`}
-                    >
-                      Pixels (px)
-                    </button>
-                  )}
-                  {currentTool !== 'resize-pixels' && currentTool !== 'change-dimensions' && (
-                    <button
-                      onClick={() => setResizeMode('%')}
-                      className={`px-3 py-1 rounded-md transition ${resizeMode === '%' ? 'bg-white shadow text-indigo-600' : 'text-gray-600'}`}
-                    >
-                      Percentage (%)
-                    </button>
-                  )}
-                </div>
-
-                {resizeMode === 'px' && (
-                  <button
-                    type="button"
-                    onClick={() => setKeepAspectRatio(!keepAspectRatio)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 ${
-                      keepAspectRatio ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-200 text-gray-600'
-                    }`}
-                  >
-                    {keepAspectRatio ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
-                    <span>{keepAspectRatio ? 'Aspect Ratio Locked' : 'Ratio Unlocked'}</span>
-                  </button>
-                )}
-              </div>
-
-              {resizeMode === 'px' && currentTool !== 'resize-percentage' ? (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-500 mb-1">Width (px)</label>
-                      <input
-                        type="number"
-                        value={width}
-                        onChange={(e) => handleWidthInput(e.target.value)}
-                        className="w-full border rounded-lg p-2 text-sm bg-white font-semibold"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-500 mb-1">Height (px)</label>
-                      <input
-                        type="number"
-                        value={height}
-                        onChange={(e) => handleHeightInput(e.target.value)}
-                        className="w-full border rounded-lg p-2 text-sm bg-white font-semibold"
-                      />
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500 font-medium">Original Dimensions: {activeInfo.width} × {activeInfo.height} px</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
-                    <span>Resize Scale: {pctVal}%</span>
-                    <span className="text-indigo-600 font-bold">
-                      Calculated Target: {Math.round(activeInfo.width * (pctVal / 100))} × {Math.round(activeInfo.height * (pctVal / 100))} px
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="200"
-                    value={pctVal}
-                    onChange={(e) => applyPresetScaling(Number(e.target.value))}
-                    className="w-full accent-indigo-600"
-                  />
-                  <div className="flex space-x-2 pt-1">
-                    {[25, 50, 75, 100, 125, 150].map((p) => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => applyPresetScaling(p)}
-                        className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
-                          pctVal === p ? 'bg-indigo-600 text-white' : 'bg-white border text-gray-700 hover:border-indigo-400'
-                        }`}
+                      <span
+                        style={{
+                          color: textColor,
+                          opacity: textOpacity / 100,
+                          fontSize: `${textSizeRatio / 2}px`
+                        }}
+                        className="font-bold whitespace-nowrap"
                       >
-                        {p}%
-                      </button>
-                    ))}
+                        {watermarkText || 'Sample Text'}
+                      </span>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        bottom: textPosition === 'bottom' ? '12px' : textPosition === 'top' ? 'auto' : '50%',
+                        top: textPosition === 'top' ? '12px' : 'auto',
+                        transform: textPosition === 'center' ? 'translateY(50%)' : 'none',
+                        color: textColor,
+                        opacity: textOpacity / 100,
+                        fontSize: `${textSizeRatio / 2}px`
+                      }}
+                      className="font-bold text-center px-4 drop-shadow-md"
+                    >
+                      {watermarkText || 'Sample Text'}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* --- 4. DEDICATED REMOVE METADATA TOOL --- */}
+          {currentTool === 'remove-metadata' && (
+            <div className="space-y-4">
+              <div className="p-5 bg-amber-50/70 border border-amber-200 rounded-xl space-y-3">
+                <div className="flex items-start space-x-3">
+                  <Shield className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-bold text-amber-900 text-sm">EXIF Privacy Protection Active</h4>
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      Exporting your photos with this tool strips invisible metadata, including GPS camera location coordinates, device models, and timestamp headers without reducing visible image resolution.
+                    </p>
                   </div>
                 </div>
-              )}
+              </div>
+
+              {/* Detected Metadata Properties */}
+              <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
+                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Detected Metadata Tags (Will Be Stripped)</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                  <div className="p-2.5 bg-white border rounded-lg">
+                    <span className="text-gray-400 block text-[10px]">FILE NAME</span>
+                    <span className="font-bold text-gray-800 truncate block">{activeInfo.name}</span>
+                  </div>
+                  <div className="p-2.5 bg-white border rounded-lg">
+                    <span className="text-gray-400 block text-[10px]">FILE TYPE</span>
+                    <span className="font-bold text-gray-800 uppercase">{activeInfo.type.replace('image/', '')}</span>
+                  </div>
+                  <div className="p-2.5 bg-white border rounded-lg">
+                    <span className="text-gray-400 block text-[10px]">GPS LOCATION TAG</span>
+                    <span className="font-bold text-red-600">Stripped on Export</span>
+                  </div>
+                  <div className="p-2.5 bg-white border rounded-lg">
+                    <span className="text-gray-400 block text-[10px]">RESOLUTION</span>
+                    <span className="font-bold text-gray-800">{activeInfo.width} × {activeInfo.height} px</span>
+                  </div>
+                  <div className="p-2.5 bg-white border rounded-lg">
+                    <span className="text-gray-400 block text-[10px]">MODIFIED TIMESTAMP</span>
+                    <span className="font-bold text-gray-800 truncate block">{activeInfo.lastModified || 'Detected'}</span>
+                  </div>
+                  <div className="p-2.5 bg-white border rounded-lg">
+                    <span className="text-gray-400 block text-[10px]">EXIF CAMERA HEADERS</span>
+                    <span className="font-bold text-red-600">Stripped on Export</span>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -1863,7 +1735,6 @@ const PdfToolEngine = ({ toolId }) => {
         />
       </label>
 
-      {/* --- PDF UPLOAD CONFIRMATION VISUAL FEEDBACK CARDS --- */}
       {files.length > 0 && (
         <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-3">
           <div className="flex items-center justify-between">
