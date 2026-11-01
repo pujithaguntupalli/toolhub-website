@@ -3,7 +3,7 @@ import {
   Search, Calculator, ArrowRightLeft, FileText, Image as ImageIcon, 
   Download, Upload, Trash2, RotateCw, Sparkles, AlertCircle, ChevronRight,
   Layers, Lock, Unlock, ArrowLeft, Star, Clock, Percent, Volume2, Cpu,
-  Database, Flame, HardDrive, Compass, Thermometer, Box, Scale, Shield, Maximize2, Crop, CheckCircle2, Grid, ZoomIn, ZoomOut, RefreshCw
+  Database, Flame, HardDrive, Compass, Thermometer, Box, Scale, Shield, Maximize2, Crop, CheckCircle2, Grid, ZoomIn, ZoomOut, RefreshCw, FlipHorizontal, FlipVertical
 } from 'lucide-react';
 
 // --- CONVERTER DATA & FORMULAS ---
@@ -78,7 +78,7 @@ export const IMAGE_TOOLS = [
   { id: 'resize-image', name: 'Resize Image', description: 'Batch scale resolution with px/% controls, aspect ratio lock & live file size estimator.', keywords: ['resize', 'dimensions', 'width', 'height', 'scale', 'pixels', 'batch'] },
   { id: 'crop-image', name: 'Crop Image', description: 'Interactive cropper with composition grids, zoom, continuous rotation & high-res rendering.', keywords: ['crop', 'trim', 'cut', 'aspect ratio', 'interactive', 'rotate'] },
   { id: 'rotate-image', name: 'Rotate Image', description: 'Rotate image by 90, 180, or 270 degrees.', keywords: ['rotate', 'turn', 'angle'] },
-  { id: 'flip-image', name: 'Flip Image', description: 'Flip image horizontally or vertically.', keywords: ['flip', 'mirror'] },
+  { id: 'flip-image', name: 'Flip Image', description: 'Horizontal, vertical & dual-axis 180° inversion with selective region flipping & non-destructive preview.', keywords: ['flip', 'mirror', 'horizontal', 'vertical', 'dual axis', 'selective', 'invert'] },
   { id: 'jpg-to-png', name: 'JPG to PNG', description: 'Convert JPG images to PNG format.', keywords: ['jpg', 'png', 'convert'] },
   { id: 'png-to-jpg', name: 'PNG to JPG', description: 'Convert PNG images to JPG format.', keywords: ['png', 'jpg', 'convert'] },
   { id: 'webp-to-jpg', name: 'WEBP to JPG', description: 'Convert WEBP images to JPG format.', keywords: ['webp', 'jpg', 'convert'] },
@@ -272,7 +272,11 @@ const AdvancedCompressImage = ({ toolId }) => {
   const [gridOverlay, setGridOverlay] = useState('thirds'); // 'none', 'thirds', 'golden'
   const [rotationAngle, setRotationAngle] = useState(0); // -180 to 180 continuous degrees
   const [rotation, setRotation] = useState(90); // Preset rotation (90, 180, 270)
-  const [flipMode, setFlipMode] = useState('horizontal');
+  
+  // --- FLIP IMAGE DEDICATED STATES ---
+  const [flipAxis, setFlipAxis] = useState('horizontal'); // 'horizontal', 'vertical', 'dual'
+  const [flipScope, setFlipScope] = useState('full'); // 'full' (entire background) or 'selective' (selection layer)
+  
   const [flipHoriz, setFlipHoriz] = useState(false);
   const [flipVert, setFlipVert] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -406,7 +410,7 @@ const AdvancedCompressImage = ({ toolId }) => {
     });
   };
 
-  // Dragging Handlers for Interactive Cropper Box
+  // Dragging Handlers for Interactive Box (Cropper & Selective Flipping)
   const startDrag = (e, type) => {
     e.stopPropagation();
     isDragging.current = true;
@@ -456,7 +460,7 @@ const AdvancedCompressImage = ({ toolId }) => {
     isDragging.current = false;
   };
 
-  // High-Resolution Processing Engine (With Rotation Fixes)
+  // High-Resolution Processing Engine (With Flip & Rotation Logic)
   const executeImageEngine = async () => {
     if (files.length === 0) return;
     setIsProcessing(true);
@@ -510,7 +514,24 @@ const AdvancedCompressImage = ({ toolId }) => {
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
 
-      if (currentTool === 'circular-crop') {
+      if (currentTool === 'flip-image' && flipScope === 'selective') {
+        // Selective / Layer Flipping Mode
+        ctx.drawImage(bitmap, 0, 0, sourceW, sourceH, 0, 0, renderW, renderH);
+
+        const selX = Math.round((renderW * cropBox.x) / 100);
+        const selY = Math.round((renderH * cropBox.y) / 100);
+        const selW = Math.round((renderW * cropBox.w) / 100);
+        const selH = Math.round((renderH * cropBox.h) / 100);
+
+        const scaleX = flipAxis === 'horizontal' || flipAxis === 'dual' ? -1 : 1;
+        const scaleY = flipAxis === 'vertical' || flipAxis === 'dual' ? -1 : 1;
+
+        ctx.save();
+        ctx.translate(selX + selW / 2, selY + selH / 2);
+        ctx.scale(scaleX, scaleY);
+        ctx.drawImage(bitmap, (sourceW * cropBox.x) / 100, (sourceH * cropBox.y) / 100, (sourceW * cropBox.w) / 100, (sourceH * cropBox.h) / 100, -selW / 2, -selH / 2, selW, selH);
+        ctx.restore();
+      } else if (currentTool === 'circular-crop') {
         ctx.beginPath();
         ctx.arc(renderW / 2, renderH / 2, renderW / 2, 0, Math.PI * 2);
         ctx.clip();
@@ -522,12 +543,13 @@ const AdvancedCompressImage = ({ toolId }) => {
         if (currentTool === 'blur-image') ctx.filter = `blur(${blurRadius}px)`;
 
         ctx.save();
-        // Translate origin to center of canvas for proper rotation pivot
         ctx.translate(renderW / 2, renderH / 2);
         ctx.rotate((currentAngle * Math.PI) / 180);
 
         if (currentTool === 'flip-image') {
-          ctx.scale(flipMode === 'horizontal' ? -1 : 1, flipMode === 'vertical' ? -1 : 1);
+          const scaleX = flipAxis === 'horizontal' || flipAxis === 'dual' ? -1 : 1;
+          const scaleY = flipAxis === 'vertical' || flipAxis === 'dual' ? -1 : 1;
+          ctx.scale(scaleX, scaleY);
         } else if (currentTool === 'crop-image') {
           ctx.scale(flipHoriz ? -1 : 1, flipVert ? -1 : 1);
         }
@@ -539,7 +561,6 @@ const AdvancedCompressImage = ({ toolId }) => {
           const cropH = Math.round((sourceH * cropBox.h) / 100);
           ctx.drawImage(bitmap, cropX, cropY, cropW, cropH, -renderW / 2, -renderH / 2, renderW, renderH);
         } else {
-          // Draw centered around origin
           const drawW = (normalizedAngle === 90 || normalizedAngle === 270) ? renderH : renderW;
           const drawH = (normalizedAngle === 90 || normalizedAngle === 270) ? renderW : renderH;
           ctx.drawImage(bitmap, -drawW / 2, -drawH / 2, drawW, drawH);
@@ -584,7 +605,9 @@ const AdvancedCompressImage = ({ toolId }) => {
           Active Tool: {currentTool.replace(/-/g, ' ')}
         </h3>
         <p className="text-xs text-indigo-700 mt-0.5">
-          {currentTool === 'resize-image' || ['change-dimensions', 'resize-pixels', 'resize-percentage'].includes(currentTool)
+          {currentTool === 'flip-image'
+            ? 'Horizontal (left-right), Vertical (top-bottom), and Dual-Axis 180° inversion flipping. Supports selective layer flipping and live preview.'
+            : currentTool === 'resize-image' || ['change-dimensions', 'resize-pixels', 'resize-percentage'].includes(currentTool)
             ? 'Batch scale dimensions via manual px inputs, percentage shortcuts, aspect ratio locking & real-time file size estimation.'
             : currentTool === 'crop-image'
             ? 'Interactive cropper featuring Rule-of-Thirds & Golden Ratio overlays, zoom, pan controls, continuous rotation & high-resolution rendering.'
@@ -620,6 +643,130 @@ const AdvancedCompressImage = ({ toolId }) => {
                   {f.name}
                 </button>
               ))}
+            </div>
+          )}
+
+          {/* --- FLIP IMAGE TOOL INTERACTIVE CANVAS & CONTROLS --- */}
+          {currentTool === 'flip-image' && (
+            <div className="space-y-5">
+              <div className="p-4 bg-gray-50 rounded-xl space-y-4 border border-gray-200">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Flip Axis Selector */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-2">Flip Axis Target</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFlipAxis('horizontal')}
+                        className={`flex flex-col items-center justify-center p-2.5 rounded-lg text-xs font-bold transition border ${
+                          flipAxis === 'horizontal' ? 'bg-indigo-600 text-white border-indigo-600 shadow' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
+                        }`}
+                      >
+                        <FlipHorizontal className="w-4 h-4 mb-1" />
+                        <span>Horizontal</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFlipAxis('vertical')}
+                        className={`flex flex-col items-center justify-center p-2.5 rounded-lg text-xs font-bold transition border ${
+                          flipAxis === 'vertical' ? 'bg-indigo-600 text-white border-indigo-600 shadow' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
+                        }`}
+                      >
+                        <FlipVertical className="w-4 h-4 mb-1" />
+                        <span>Vertical</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFlipAxis('dual')}
+                        className={`flex flex-col items-center justify-center p-2.5 rounded-lg text-xs font-bold transition border ${
+                          flipAxis === 'dual' ? 'bg-indigo-600 text-white border-indigo-600 shadow' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
+                        }`}
+                      >
+                        <RefreshCw className="w-4 h-4 mb-1" />
+                        <span>Dual-Axis (180°)</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Selective / Layer Flipping Scope */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-2">Flipping Scope</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFlipScope('full')}
+                        className={`py-2.5 px-3 rounded-lg text-xs font-bold transition border ${
+                          flipScope === 'full' ? 'bg-indigo-600 text-white border-indigo-600 shadow' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
+                        }`}
+                      >
+                        Full Background Canvas
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFlipScope('selective')}
+                        className={`py-2.5 px-3 rounded-lg text-xs font-bold transition border ${
+                          flipScope === 'selective' ? 'bg-indigo-600 text-white border-indigo-600 shadow' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
+                        }`}
+                      >
+                        Selective / Layer Region
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-xs text-indigo-700 bg-indigo-50/80 p-2.5 rounded-lg font-medium border border-indigo-100">
+                  {flipScope === 'full'
+                    ? `Mode: Full Canvas Image ${flipAxis === 'horizontal' ? 'Horizontal (Mirror Left-Right)' : flipAxis === 'vertical' ? 'Vertical (Mirror Top-Bottom)' : 'Dual-Axis (180° Inversion)'}`
+                    : `Mode: Selective Layer Region. Drag handle on preview below to select area to flip.`}
+                </div>
+              </div>
+
+              {/* Non-Destructive Live Preview Stage */}
+              <div
+                ref={containerRef}
+                onMouseMove={onMouseMove}
+                onMouseUp={stopDrag}
+                onMouseLeave={stopDrag}
+                className="relative w-full h-[360px] bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center select-none"
+              >
+                <div className="relative max-h-full max-w-full flex items-center justify-center">
+                  <img
+                    src={activeInfo.url}
+                    alt="Flip Live Preview Target"
+                    style={{
+                      transform: flipScope === 'full' 
+                        ? `scale(${flipAxis === 'horizontal' || flipAxis === 'dual' ? -1 : 1}, ${flipAxis === 'vertical' || flipAxis === 'dual' ? -1 : 1})`
+                        : 'none',
+                      maxHeight: '340px',
+                      maxWidth: '100%',
+                      objectFit: 'contain'
+                    }}
+                    className="pointer-events-none transition-transform duration-150"
+                  />
+
+                  {/* Selective Layer Region Overlay Box */}
+                  {flipScope === 'selective' && (
+                    <div
+                      style={{
+                        left: `${cropBox.x}%`,
+                        top: `${cropBox.y}%`,
+                        width: `${cropBox.w}%`,
+                        height: `${cropBox.h}%`
+                      }}
+                      onMouseDown={(e) => startDrag(e, 'move')}
+                      className="absolute border-2 border-dashed border-amber-400 bg-amber-400/20 cursor-move"
+                    >
+                      <div className="absolute top-1 left-1 bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow">
+                        Selective Layer Region
+                      </div>
+                      <div onMouseDown={(e) => startDrag(e, 'nw')} className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 bg-amber-500 border border-white rounded-full cursor-nwse-resize" />
+                      <div onMouseDown={(e) => startDrag(e, 'ne')} className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-amber-500 border border-white rounded-full cursor-nesw-resize" />
+                      <div onMouseDown={(e) => startDrag(e, 'sw')} className="absolute -bottom-1.5 -left-1.5 w-3.5 h-3.5 bg-amber-500 border border-white rounded-full cursor-nesw-resize" />
+                      <div onMouseDown={(e) => startDrag(e, 'se')} className="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 bg-amber-500 border border-white rounded-full cursor-nwse-resize" />
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
