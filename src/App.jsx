@@ -2120,7 +2120,7 @@ const UniversalCalculator = ({ toolId }) => {
             <option>What percent is X of Y</option>
           </select>
           <div className="grid grid-cols-2 gap-3">
-            <input type="number" placeholder="Value A (18)" onChange={(e) => handleInputChange('a', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
+            <input type="number" placeholder="Percentage Value(18)" onChange={(e) => handleInputChange('a', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
             <input type="number" placeholder="Value B (240)" onChange={(e) => handleInputChange('b', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
           </div>
         </div>
