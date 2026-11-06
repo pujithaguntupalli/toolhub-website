@@ -227,7 +227,7 @@ const TOOLS = [
   { id: 'ratio-calc', name: 'Ratio Calculator', category: 'calculators', icon: 'Calculator', desc: 'Simplify a two-part ratio and find its share.', keywords: 'proportion scale simplify aspect divide' },
   { id: 'fraction-calc', name: 'Fraction Calculator', category: 'calculators', icon: 'Calculator', desc: 'Simplify a fraction and show its decimal value.', keywords: 'numerator denominator reduce math' },
   { id: 'scientific-calc', name: 'Scientific Calculator', category: 'calculators', icon: 'Calculator', desc: 'Evaluate a scientific operation on one or two values.', keywords: 'sin cos log sqrt exponent trig' },
-  { id: 'basic-calc', name: 'Basic Calculator', category: 'calculators', icon: 'Calculator', desc: 'Quickly evaluate two values with a basic arithmetic operation.', keywords: 'arithmetic add subtract multiply divide math' },
+  { id: 'basic-calc', name: 'Basic Calculator', category: 'calculators', icon: 'Calculator', desc: 'Evaluate single or multiple values across standard arithmetic operations.', keywords: 'arithmetic add subtract multiply divide math sum' },
   { id: 'hcf-lcm', name: 'HCF and LCM Calculator', category: 'calculators', icon: 'Calculator', desc: 'Find the highest common factor and least common multiple.', keywords: 'gcd greatest common divisor multiple prime' },
   { id: 'unit-price', name: 'Unit Price Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Compare cost per standard unit for shopping decisions.', keywords: 'price per unit compare value cost grocery' },
   { id: 'savings-goal', name: 'Savings Goal Calculator', category: 'calculators', icon: 'DollarSign', desc: 'Estimate the monthly amount needed to reach a savings target.', keywords: 'saving plan monthly savings goal target' },
@@ -1756,12 +1756,44 @@ const UniversalCalculator = ({ toolId }) => {
         break;
       }
       case 'basic-calc': {
-        if (!numeric(['a', 'b'])) return;
-        const a = val('a'), b = val('b');
         const op = inputs.operation || 'Add (+)';
-        if (op.includes('Divide') && b === 0) return setResult({ error: 'Cannot divide by zero.' });
-        const res = op.includes('Subtract') ? a - b : op.includes('Multiply') ? a * b : op.includes('Divide') ? a / b : a + b;
-        setResult({ output: fmt(res), note: `Calculation: ${a} ${op.match(/\((.)\)/)?.[1] || '+'} ${b}` });
+
+        if (op.includes('Add') || op.includes('Multiply')) {
+          const ns = (inputs.numbers || '')
+            .split(/[,\s]+/)
+            .filter(Boolean)
+            .map(Number);
+
+          if (!ns.length || ns.some(n => !Number.isFinite(n))) {
+            return setResult({ error: 'Please enter valid numbers separated by commas or spaces.' });
+          }
+
+          if (op.includes('Add')) {
+            const sum = ns.reduce((acc, curr) => acc + curr, 0);
+            setResult({
+              output: `Sum: ${fmt(sum)}`,
+              note: `Added ${ns.length} values (${ns.join(' + ')})`
+            });
+          } else {
+            const product = ns.reduce((acc, curr) => acc * curr, 1);
+            setResult({
+              output: `Product: ${fmt(product)}`,
+              note: `Multiplied ${ns.length} values (${ns.join(' × ')})`
+            });
+          }
+        } else {
+          if (!numeric(['a', 'b'])) return setResult({ error: 'Please enter valid numbers.' });
+          const a = val('a'), b = val('b');
+
+          if (op.includes('Divide')) {
+            if (b === 0) return setResult({ error: 'Cannot divide by zero.' });
+            const res = a / b;
+            setResult({ output: `Result: ${fmt(res)}`, note: `Calculation: ${a} ÷ ${b}` });
+          } else if (op.includes('Subtract')) {
+            const res = a - b;
+            setResult({ output: `Result: ${fmt(res)}`, note: `Calculation: ${a} − ${b}` });
+          }
+        }
         break;
       }
       case 'hcf-lcm': {
@@ -1973,16 +2005,44 @@ const UniversalCalculator = ({ toolId }) => {
 
       {toolId === 'basic-calc' && (
         <div className="space-y-3">
-          <select onChange={(e) => handleInputChange('operation', e.target.value)} className="w-full border rounded-lg p-2.5 text-sm bg-white">
+          <select 
+            onChange={(e) => handleInputChange('operation', e.target.value)} 
+            className="w-full border rounded-lg p-2.5 text-sm bg-white font-semibold"
+          >
             <option>Add (+)</option>
-            <option>Subtract (−)</option>
             <option>Multiply (×)</option>
+            <option>Subtract (−)</option>
             <option>Divide (÷)</option>
           </select>
-          <div className="grid grid-cols-2 gap-3">
-            <input type="number" placeholder="First Number" onChange={(e) => handleInputChange('a', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
-            <input type="number" placeholder="Second Number" onChange={(e) => handleInputChange('b', e.target.value)} className="border rounded-lg p-2.5 text-sm" />
-          </div>
+
+          {(inputs.operation === 'Subtract (−)' || inputs.operation === 'Divide (÷)') ? (
+            <div className="grid grid-cols-2 gap-3">
+              <input 
+                type="number" 
+                placeholder="First Number" 
+                onChange={(e) => handleInputChange('a', e.target.value)} 
+                className="border rounded-lg p-2.5 text-sm" 
+              />
+              <input 
+                type="number" 
+                placeholder="Second Number" 
+                onChange={(e) => handleInputChange('b', e.target.value)} 
+                className="border rounded-lg p-2.5 text-sm" 
+              />
+            </div>
+          ) : (
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">
+                Enter multiple numbers separated by commas or spaces
+              </label>
+              <input 
+                type="text" 
+                placeholder="e.g., 10, 25, 4.5, 12" 
+                onChange={(e) => handleInputChange('numbers', e.target.value)} 
+                className="w-full border rounded-lg p-2.5 text-sm font-semibold" 
+              />
+            </div>
+          )}
         </div>
       )}
 
