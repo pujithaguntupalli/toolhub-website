@@ -930,6 +930,19 @@ const AdvancedCompressImage = ({ toolId }) => {
           )}
         </>
       )}
+
+      {/* Structured SEO Guide Section for AdSense & User Guidance */}
+      <div className="mt-8 pt-6 border-t border-slate-100 space-y-3">
+        <h4 className="text-sm font-bold text-slate-900">How to Use the {currentTool.replace(/-/g, ' ')}</h4>
+        <p className="text-xs text-slate-600 leading-relaxed">
+          Select your target files using the batch upload area above. Choose your desired output formats or quality options and click process. All computations execute locally on your browser without server uploads.
+        </p>
+        <div className="bg-slate-50 p-3 rounded-lg text-xs text-slate-600 space-y-1">
+          <p className="font-semibold text-slate-800">Frequently Asked Questions:</p>
+          <p>• <strong>Is my privacy guaranteed?</strong> Yes, your files stay on your machine using browser Canvas APIs.</p>
+          <p>• <strong>Is there a limit on conversions?</strong> No limits. Process as many files as you need for free.</p>
+        </div>
+      </div>
     </div>
   );
 };
@@ -2099,6 +2112,14 @@ const UniversalCalculator = ({ toolId }) => {
           )}
         </div>
       )}
+
+      {/* Structured SEO Guide Section */}
+      <div className="mt-8 pt-6 border-t border-slate-100 space-y-3">
+        <h4 className="text-sm font-bold text-slate-900">About {toolId.replace('-', ' ')}</h4>
+        <p className="text-xs text-slate-600 leading-relaxed">
+          Perform fast calculations right in your browser. All algorithms calculate outputs locally with high precision.
+        </p>
+      </div>
     </div>
   );
 };
@@ -2162,6 +2183,14 @@ const UniversalConverter = ({ toolId }) => {
           {result || '—'} <span className="text-lg font-medium">{toUnit}</span>
         </p>
       </div>
+
+      {/* Structured SEO Guide Section */}
+      <div className="mt-8 pt-6 border-t border-slate-100 space-y-3">
+        <h4 className="text-sm font-bold text-slate-900">How Unit Conversions Work</h4>
+        <p className="text-xs text-slate-600 leading-relaxed">
+          Unit conversions rely on fixed mathematical factors. Enter any numerical quantity above to calculate instant equivalents.
+        </p>
+      </div>
     </div>
   );
 };
@@ -2221,12 +2250,25 @@ export default function App() {
             </div>
           </div>
 
-          <div className="hidden md:flex items-center space-x-6 text-sm font-medium">
-            <button onClick={() => { setActiveToolId(null); setPage('app'); setActiveCategory('all'); }} className="hover:text-indigo-600">All Tools</button>
-            <button onClick={() => { setActiveToolId(null); setPage('app'); setActiveCategory('image'); }} className="hover:text-indigo-600">Image Tools</button>
-            <button onClick={() => { setActiveToolId(null); setPage('app'); setActiveCategory('pdf'); }} className="hover:text-indigo-600">PDF Tools</button>
-            <button onClick={() => { setActiveToolId(null); setPage('app'); setActiveCategory('converters'); }} className="hover:text-indigo-600">Converters</button>
-            <button onClick={() => { setActiveToolId(null); setPage('app'); setActiveCategory('calculators'); }} className="hover:text-indigo-600">Calculators</button>
+          <div className="flex items-center space-x-4">
+            <div className="hidden md:flex items-center space-x-6 text-sm font-medium">
+              <button onClick={() => { setActiveToolId(null); setPage('app'); setActiveCategory('all'); }} className="hover:text-indigo-600">All Tools</button>
+              <button onClick={() => { setActiveToolId(null); setPage('app'); setActiveCategory('image'); }} className="hover:text-indigo-600">Image Tools</button>
+              <button onClick={() => { setActiveToolId(null); setPage('app'); setActiveCategory('pdf'); }} className="hover:text-indigo-600">PDF Tools</button>
+              <button onClick={() => { setActiveToolId(null); setPage('app'); setActiveCategory('converters'); }} className="hover:text-indigo-600">Converters</button>
+              <button onClick={() => { setActiveToolId(null); setPage('app'); setActiveCategory('calculators'); }} className="hover:text-indigo-600">Calculators</button>
+            </div>
+
+            {/* BUY ME A COFFEE HEADER BUTTON */}
+            <a
+              href="https://buymeacoffee.com/guntupalli_pujitha"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center space-x-1.5 bg-amber-400 hover:bg-amber-500 text-slate-900 font-bold px-3.5 py-2 rounded-xl text-xs transition shadow-sm"
+            >
+              <span>☕</span>
+              <span className="hidden sm:inline">Buy me a coffee</span>
+            </a>
           </div>
         </div>
       </header>
@@ -2375,6 +2417,16 @@ export default function App() {
             <button onClick={() => setPage('privacy')} className="hover:text-indigo-600">Privacy Policy</button>
             <button onClick={() => setPage('terms')} className="hover:text-indigo-600">Terms of Use</button>
             <button onClick={() => setPage('contact')} className="hover:text-indigo-600">Contact</button>
+          </div>
+          <div className="pt-2">
+            <a
+              href="https://buymeacoffee.com/guntupalli_pujitha"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center space-x-2 text-xs font-semibold text-slate-600 hover:text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-200 transition"
+            >
+              <span>☕ Enjoying ToolHub? Support the project on Buy Me a Coffee</span>
+            </a>
           </div>
           <p className="text-xs text-slate-400">
             © {new Date().getFullYear()} ToolHub Web Application. All rights reserved. Client-side Processing Architecture.
