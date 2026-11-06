@@ -72,6 +72,38 @@ function convertUnits(slug, amount, from, to) {
   return fmt(num * uFrom[1] / uTo[1]);
 }
 
+// --- BMP ENCODER HELPER ---
+function convertImageDataToBmp(imageData) {
+  const width = imageData.width;
+  const height = imageData.height;
+  const data = imageData.data;
+  
+  const fileLength = 54 + width * height * 4;
+  const buffer = new ArrayBuffer(fileLength);
+  const view = new DataView(buffer);
+  
+  // BMP Header (54 bytes)
+  view.setUint16(0, 0x4D42, true); // "BM" magic number
+  view.setUint32(2, fileLength, true);
+  view.setUint32(10, 54, true); // Offset to pixel array
+  view.setUint32(14, 40, true); // DIB header size
+  view.setInt32(18, width, true);
+  view.setInt32(22, -height, true); // Top-down BMP
+  view.setUint16(26, 1, true); // Color planes
+  view.setUint16(28, 32, true); // 32 bits per pixel (RGBA)
+  
+  // Copy RGBA pixels -> BGRA order
+  let pos = 54;
+  for (let i = 0; i < data.length; i += 4) {
+    view.setUint8(pos++, data[i + 2]); // Blue
+    view.setUint8(pos++, data[i + 1]); // Green
+    view.setUint8(pos++, data[i]);     // Red
+    view.setUint8(pos++, data[i + 3]); // Alpha
+  }
+  
+  return new Blob([buffer], { type: 'image/bmp' });
+}
+
 // --- CONSOLIDATED IMAGE TOOLS DEFINITION ---
 export const IMAGE_TOOLS = [
   { id: 'format-converter', name: 'Image Format Converter', description: 'Universal format converter supporting JPG, JPEG, PNG, WEBP, and BMP with high quality batch exports.', keywords: ['format', 'convert', 'image', 'jpg', 'jpeg', 'png', 'webp', 'bmp'] },
@@ -351,7 +383,7 @@ const AdvancedCompressImage = ({ toolId }) => {
 
     const areaRatio = (targetW * targetH) / (activeInfo.width * activeInfo.height);
     const selectedFormat = currentTool === 'format-converter' ? targetFormat : outputFormat;
-    const formatMultiplier = selectedFormat === 'image/png' ? 1.2 : selectedFormat === 'image/webp' ? 0.7 : 0.85;
+    const formatMultiplier = selectedFormat === 'image/png' ? 1.2 : selectedFormat === 'image/webp' ? 0.7 : selectedFormat === 'image/bmp' ? 3.0 : 0.85;
     const estimated = activeInfo.size * areaRatio * (quality / 100) * formatMultiplier;
     return Math.max(1024, Math.round(estimated));
   }, [activeInfo, width, height, pctVal, cropBox, quality, currentTool, resizeMode, targetFormat, outputFormat, squareMode, circleScale]);
@@ -401,59 +433,6 @@ const AdvancedCompressImage = ({ toolId }) => {
     }
   };
 
-  const handleWidthInput = (val) => {
-    const w = Number(val);
-    setWidth(w);
-    if (keepAspectRatio && activeInfo.width > 0 && w > 0) {
-      setHeight(Math.round(w * (activeInfo.height / activeInfo.width)));
-    }
-  };
-
-  const handleHeightInput = (val) => {
-    const h = Number(val);
-    setHeight(h);
-    if (keepAspectRatio && activeInfo.height > 0 && h > 0) {
-      setWidth(Math.round(h * (activeInfo.width / activeInfo.height)));
-    }
-  };
-
-  const applyPresetScaling = (percent) => {
-    setPctVal(percent);
-    if (!activeInfo.width || !activeInfo.height) return;
-    const scaledW = Math.round(activeInfo.width * (percent / 100));
-    const scaledH = Math.round(activeInfo.height * (percent / 100));
-    setWidth(scaledW);
-    setHeight(scaledH);
-  };
-
-  const applyCropRatio = (preset) => {
-    setCropRatioPreset(preset);
-    if (preset === 'Freeform') return;
-
-    let targetRatio = 1;
-    if (preset === '1:1') targetRatio = 1;
-    else if (preset === '16:9') targetRatio = 16 / 9;
-    else if (preset === '9:16') targetRatio = 9 / 16;
-    else if (preset === '4:3') targetRatio = 4 / 3;
-    else if (preset === '4:5') targetRatio = 4 / 5;
-
-    const imgRatio = activeInfo.width / activeInfo.height;
-    let boxW = 80;
-    let boxH = (boxW * imgRatio) / targetRatio;
-
-    if (boxH > 90) {
-      boxH = 80;
-      boxW = (boxH * targetRatio) / imgRatio;
-    }
-
-    setCropBox({
-      x: Math.max(0, Math.round((100 - boxW) / 2)),
-      y: Math.max(0, Math.round((100 - boxH) / 2)),
-      w: Math.round(boxW),
-      h: Math.round(boxH)
-    });
-  };
-
   const startDrag = (e, type) => {
     e.stopPropagation();
     isDragging.current = true;
@@ -461,13 +440,6 @@ const AdvancedCompressImage = ({ toolId }) => {
     startMouse.current = { x: e.clientX, y: e.clientY };
     startBox.current = { ...cropBox };
     startPan.current = { ...panPos };
-  };
-
-  const startCircleDrag = (e) => {
-    e.preventDefault();
-    isCircleDragging.current = true;
-    startMouse.current = { x: e.clientX, y: e.clientY };
-    startCirclePan.current = { x: circleCenterX, y: circleCenterY };
   };
 
   const onMouseMove = (e) => {
@@ -764,7 +736,13 @@ const AdvancedCompressImage = ({ toolId }) => {
         ctx.restore();
       }
 
-      const blob = await new Promise((res) => canvas.toBlob(res, effectiveFormat, quality / 100));
+      let blob;
+      if (effectiveFormat === 'image/bmp') {
+        const imgData = ctx.getImageData(0, 0, renderW, renderH);
+        blob = convertImageDataToBmp(imgData);
+      } else {
+        blob = await new Promise((res) => canvas.toBlob(res, effectiveFormat, quality / 100));
+      }
       bitmap.close();
 
       const extMap = {
@@ -795,7 +773,9 @@ const AdvancedCompressImage = ({ toolId }) => {
           Active Tool: {currentTool.replace(/-/g, ' ')}
         </h3>
         <p className="text-xs text-indigo-700 mt-0.5">
-          {currentTool === 'grayscale-image'
+          {currentTool === 'format-converter'
+            ? 'Convert image files seamlessly into PNG, JPEG, WEBP, or BMP format.'
+            : currentTool === 'grayscale-image'
             ? 'Convert color photos into desaturated black & white or high-contrast threshold artworks.'
             : currentTool === 'blur-image'
             ? 'Apply smooth privacy Gaussian blur across full canvas or draggable selective regions.'
@@ -866,300 +846,22 @@ const AdvancedCompressImage = ({ toolId }) => {
 
       {files.length > 0 && activeInfo && (
         <>
-          {/* --- 1. DEDICATED GRAYSCALE FILTER TOOL --- */}
-          {currentTool === 'grayscale-image' && (
-            <div className="space-y-4">
-              <div className="p-4 bg-gray-50 rounded-xl space-y-4 border border-gray-200">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Grayscale Mode</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setGrayscaleMode('desaturate')}
-                        className={`p-2.5 rounded-lg text-xs font-bold border transition ${
-                          grayscaleMode === 'desaturate' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
-                        }`}
-                      >
-                        Smooth Desaturate
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setGrayscaleMode('threshold')}
-                        className={`p-2.5 rounded-lg text-xs font-bold border transition ${
-                          grayscaleMode === 'threshold' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
-                        }`}
-                      >
-                        High-Contrast B&W
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
-                      <span>Effect Intensity: {grayscaleAmount}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={grayscaleAmount}
-                      onChange={(e) => setGrayscaleAmount(Number(e.target.value))}
-                      className="w-full accent-indigo-600"
-                    />
-                  </div>
-                </div>
-
-                {grayscaleMode === 'threshold' && (
-                  <div className="pt-2 border-t border-gray-200">
-                    <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
-                      <span>B&W Cutoff Threshold: {bwThreshold}</span>
-                      <span className="text-gray-400">Lower = Darker, Higher = Lighter</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="255"
-                      value={bwThreshold}
-                      onChange={(e) => setBwThreshold(Number(e.target.value))}
-                      className="w-full accent-indigo-600"
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="w-full h-[320px] bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center p-4">
-                <img
-                  src={activeInfo.url}
-                  alt="Grayscale Live Preview"
-                  style={{
-                    filter: grayscaleMode === 'desaturate'
-                      ? `grayscale(${grayscaleAmount}%)`
-                      : `contrast(200%) grayscale(${grayscaleAmount}%)`
-                  }}
-                  className="max-h-full max-w-full object-contain rounded-lg"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* --- 2. DEDICATED BLUR IMAGE TOOL --- */}
-          {currentTool === 'blur-image' && (
-            <div className="space-y-4">
-              <div className="p-4 bg-gray-50 rounded-xl space-y-4 border border-gray-200">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Blur Target Scope</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setBlurMode('full')}
-                        className={`p-2.5 rounded-lg text-xs font-bold border transition ${
-                          blurMode === 'full' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
-                        }`}
-                      >
-                        Full Image Blur
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setBlurMode('selective')}
-                        className={`p-2.5 rounded-lg text-xs font-bold border transition ${
-                          blurMode === 'selective' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
-                        }`}
-                      >
-                        Selective Region Box
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
-                      <span>Blur Radius: {blurRadius}px</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="1"
-                      max="40"
-                      value={blurRadius}
-                      onChange={(e) => setBlurRadius(Number(e.target.value))}
-                      className="w-full accent-indigo-600"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div
-                ref={containerRef}
-                onMouseMove={onMouseMove}
-                onMouseUp={stopDrag}
-                onMouseLeave={stopDrag}
-                className="relative w-full h-[340px] bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center select-none"
-              >
-                <img
-                  src={activeInfo.url}
-                  alt="Blur Target Preview"
-                  style={{
-                    filter: blurMode === 'full' ? `blur(${blurRadius}px)` : 'none'
-                  }}
-                  className="max-h-full max-w-full object-contain"
-                />
-
-                {blurMode === 'selective' && (
-                  <div
-                    style={{
-                      left: `${cropBox.x}%`,
-                      top: `${cropBox.y}%`,
-                      width: `${cropBox.w}%`,
-                      height: `${cropBox.h}%`,
-                      backdropFilter: `blur(${blurRadius}px)`
-                    }}
-                    onMouseDown={(e) => startDrag(e, 'move')}
-                    className="absolute border-2 border-dashed border-red-400 bg-red-400/20 cursor-move"
-                  >
-                    <div className="absolute top-1 left-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center space-x-1 shadow">
-                      <EyeOff className="w-3 h-3" />
-                      <span>Selective Blur Zone</span>
-                    </div>
-                    <div onMouseDown={(e) => startDrag(e, 'nw')} className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 bg-red-600 border border-white rounded-full cursor-nwse-resize" />
-                    <div onMouseDown={(e) => startDrag(e, 'ne')} className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-red-600 border border-white rounded-full cursor-nesw-resize" />
-                    <div onMouseDown={(e) => startDrag(e, 'sw')} className="absolute -bottom-1.5 -left-1.5 w-3.5 h-3.5 bg-red-600 border border-white rounded-full cursor-nesw-resize" />
-                    <div onMouseDown={(e) => startDrag(e, 'se')} className="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 bg-red-600 border border-white rounded-full cursor-nwse-resize" />
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* --- 3. DEDICATED ADD TEXT TO IMAGE TOOL --- */}
-          {currentTool === 'add-text-image' && (
-            <div className="space-y-4">
-              <div className="p-4 bg-gray-50 rounded-xl space-y-4 border border-gray-200">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Watermark / Caption Text</label>
-                    <input
-                      type="text"
-                      value={watermarkText}
-                      onChange={(e) => setWatermarkText(e.target.value)}
-                      placeholder="Type custom text..."
-                      className="w-full border rounded-lg p-2.5 text-sm bg-white font-bold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Text Alignment Position</label>
-                    <select
-                      value={textPosition}
-                      onChange={(e) => setTextPosition(e.target.value)}
-                      className="w-full border rounded-lg p-2.5 text-sm bg-white font-semibold"
-                    >
-                      <option value="bottom">Bottom Caption</option>
-                      <option value="center">Center Overlay</option>
-                      <option value="top">Top Header</option>
-                      <option value="custom">Custom Position (Drag Box)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3 pt-2">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Text Color</label>
-                    <input
-                      type="color"
-                      value={textColor}
-                      onChange={(e) => setTextColor(e.target.value)}
-                      className="w-full h-9 p-0.5 border rounded-lg cursor-pointer bg-white"
-                    />
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
-                      <span>Font Size</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="15"
-                      max="100"
-                      value={textSizeRatio}
-                      onChange={(e) => setTextSizeRatio(Number(e.target.value))}
-                      className="w-full accent-indigo-600"
-                    />
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
-                      <span>Opacity: {textOpacity}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="10"
-                      max="100"
-                      value={textOpacity}
-                      onChange={(e) => setTextOpacity(Number(e.target.value))}
-                      className="w-full accent-indigo-600"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div
-                ref={containerRef}
-                onMouseMove={onMouseMove}
-                onMouseUp={stopDrag}
-                onMouseLeave={stopDrag}
-                className="relative w-full h-[340px] bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center p-4 select-none"
-              >
-                <div className="relative max-h-full max-w-full flex items-center justify-center">
-                  <img
-                    src={activeInfo.url}
-                    alt="Text Overlay Preview"
-                    className="max-h-[320px] max-w-full object-contain"
-                  />
-
-                  {textPosition === 'custom' ? (
-                    <div
-                      style={{
-                        left: `${cropBox.x}%`,
-                        top: `${cropBox.y}%`
-                      }}
-                      onMouseDown={(e) => startDrag(e, 'move')}
-                      className="absolute cursor-move bg-black/40 border border-white/50 p-2 rounded shadow"
-                    >
-                      <span
-                        style={{
-                          color: textColor,
-                          opacity: textOpacity / 100,
-                          fontSize: `${textSizeRatio / 2}px`
-                        }}
-                        className="font-bold whitespace-nowrap"
-                      >
-                        {watermarkText || 'Sample Text'}
-                      </span>
-                    </div>
-                  ) : (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        bottom: textPosition === 'bottom' ? '12px' : textPosition === 'top' ? 'auto' : '50%',
-                        top: textPosition === 'top' ? '12px' : 'auto',
-                        transform: textPosition === 'center' ? 'translateY(50%)' : 'none',
-                        color: textColor,
-                        opacity: textOpacity / 100,
-                        fontSize: `${textSizeRatio / 2}px`
-                      }}
-                      className="font-bold text-center px-4 drop-shadow-md"
-                    >
-                      {watermarkText || 'Sample Text'}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Export Settings */}
-          {currentTool !== 'format-converter' && (
-            <div className="grid grid-cols-2 gap-3 bg-gray-50 p-4 rounded-xl">
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Export Format</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-gray-50 p-4 rounded-xl">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Target Output Format</label>
+              {currentTool === 'format-converter' ? (
+                <select
+                  value={targetFormat}
+                  onChange={(e) => setTargetFormat(e.target.value)}
+                  className="w-full border rounded-lg p-2 text-sm bg-white font-semibold"
+                >
+                  <option value="image/png">PNG (.png) - Supports Transparency</option>
+                  <option value="image/jpeg">JPEG (.jpg)</option>
+                  <option value="image/webp">WEBP (.webp)</option>
+                  <option value="image/bmp">BMP (.bmp)</option>
+                </select>
+              ) : (
                 <select
                   value={outputFormat}
                   onChange={(e) => setOutputFormat(e.target.value)}
@@ -1168,9 +870,12 @@ const AdvancedCompressImage = ({ toolId }) => {
                   <option value="image/png">PNG (.png) - Supports Transparency</option>
                   <option value="image/jpeg">JPEG (.jpg)</option>
                   <option value="image/webp">WEBP (.webp)</option>
+                  <option value="image/bmp">BMP (.bmp)</option>
                 </select>
-              </div>
+              )}
+            </div>
 
+            {(currentTool === 'format-converter' ? targetFormat : outputFormat) !== 'image/bmp' && (
               <div>
                 <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
                   <span>Compression Quality ({quality}%)</span>
@@ -1184,8 +889,8 @@ const AdvancedCompressImage = ({ toolId }) => {
                   className="w-full accent-indigo-600"
                 />
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           <div className="p-3 bg-indigo-50/60 border border-indigo-100 rounded-xl flex items-center justify-between text-xs font-semibold text-indigo-900">
             <span>Estimated Output File Size:</span>
