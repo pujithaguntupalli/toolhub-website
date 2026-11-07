@@ -2431,7 +2431,7 @@ export default function App() {
             <h2 className="text-2xl font-bold text-slate-900">Contact Us</h2>
             <p>Have questions, feedback, or a tool request? We’d love to hear from you!</p>
             <div className="bg-slate-50 p-4 rounded-xl space-y-2 border border-slate-100 my-4">
-              <p><strong>Support Email:</strong> contact@toolhub-website.vercel.app</p>
+              <p><strong>Support Email:</strong> contact@pujithaguntupalli888@gmail.com</p>
               <p>
                 <strong>Support the Project: </strong> 
                 <a 
