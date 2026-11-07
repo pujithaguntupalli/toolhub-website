@@ -2392,20 +2392,59 @@ export default function App() {
         )}
 
         {page === 'about' && (
-          <div className="bg-white p-8 rounded-2xl border max-w-3xl mx-auto space-y-4">
-            <h2 className="text-2xl font-bold">About ToolHub</h2>
-            <p className="text-slate-600 leading-relaxed">
+          <div className="bg-white p-8 rounded-2xl border border-slate-200 max-w-3xl mx-auto space-y-4">
+            <h2 className="text-2xl font-bold text-slate-900">About ToolHub</h2>
+            <p className="text-slate-600 leading-relaxed text-sm">
               ToolHub is a modern, privacy-first online multi-tool suite designed to perform image conversion, document editing, unit conversions, and calculations directly inside your browser. No files are ever stored on external servers.
             </p>
           </div>
         )}
 
         {page === 'privacy' && (
-          <div className="bg-white p-8 rounded-2xl border max-w-3xl mx-auto space-y-4">
-            <h2 className="text-2xl font-bold">Privacy Policy</h2>
-            <p className="text-slate-600 leading-relaxed">
-              Your privacy is guaranteed. All PDF processing, image compression, calculations, and conversions happen locally on your client device using browser Canvas APIs and WebAssembly.
-            </p>
+          <div className="bg-white p-8 rounded-2xl border border-slate-200 max-w-3xl mx-auto space-y-4 text-sm leading-relaxed text-slate-600">
+            <h2 className="text-2xl font-bold text-slate-900">Privacy Policy</h2>
+            <p><strong>Last Updated:</strong> November 2026</p>
+            <p>Your privacy is guaranteed. All PDF processing, image compression, calculations, and conversions happen locally on your client device using browser Canvas APIs and WebAssembly.</p>
+            <h3 className="font-bold text-slate-800 text-base mt-4">1. Information Collection</h3>
+            <p>ToolHub does not collect, log, or transmit personal data or user-uploaded files to any external server. All operations stay within your web browser environment.</p>
+            <h3 className="font-bold text-slate-800 text-base mt-4">2. Cookies and Advertising</h3>
+            <p>We may use third-party vendor cookies (such as Google AdSense) to serve ads based on your prior visits to our site or other websites on the Internet.</p>
+          </div>
+        )}
+
+        {page === 'terms' && (
+          <div className="bg-white p-8 rounded-2xl border border-slate-200 max-w-3xl mx-auto space-y-4 text-sm leading-relaxed text-slate-600">
+            <h2 className="text-2xl font-bold text-slate-900">Terms of Use</h2>
+            <p><strong>Last Updated:</strong> November 2026</p>
+            <p>Welcome to <strong>ToolHub</strong>. By accessing or using our website, you agree to comply with and be bound by the following terms.</p>
+            <h3 className="font-bold text-slate-800 text-base mt-4">1. Use of Services</h3>
+            <p>ToolHub provides a collection of 80+ browser-based utilities (calculators, image processors, converters, and PDF tools) free of charge for personal or professional use.</p>
+            <h3 className="font-bold text-slate-800 text-base mt-4">2. Data Privacy & Local Execution</h3>
+            <p>All computations and file transformations are performed locally in your web browser. We do not store or transmit your documents.</p>
+            <h3 className="font-bold text-slate-800 text-base mt-4">3. Disclaimer of Warranties</h3>
+            <p>ToolHub services are provided "as is" without warranties of any kind. We do not guarantee error-free output or calculations.</p>
+          </div>
+        )}
+
+        {page === 'contact' && (
+          <div className="bg-white p-8 rounded-2xl border border-slate-200 max-w-3xl mx-auto space-y-4 text-sm leading-relaxed text-slate-600">
+            <h2 className="text-2xl font-bold text-slate-900">Contact Us</h2>
+            <p>Have questions, feedback, or a tool request? We’d love to hear from you!</p>
+            <div className="bg-slate-50 p-4 rounded-xl space-y-2 border border-slate-100 my-4">
+              <p><strong>Support Email:</strong> contact@toolhub-website.vercel.app</p>
+              <p>
+                <strong>Support the Project: </strong> 
+                <a 
+                  href="https://buymeacoffee.com/guntupalli_pujitha" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-amber-600 font-semibold underline hover:text-amber-700"
+                >
+                  Buy Me a Coffee (guntupalli_pujitha)
+                </a>
+              </p>
+            </div>
+            <p className="text-xs text-slate-400">We aim to respond to all user inquiries within 24–48 business hours.</p>
           </div>
         )}
       </main>
