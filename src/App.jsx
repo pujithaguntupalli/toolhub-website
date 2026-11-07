@@ -2172,6 +2172,16 @@ export default function App() {
     return () => window.removeEventListener('popstate', handleLocationChange);
   }, []);
 
+  // --- DYNAMIC PAGE TITLES FOR SEO INDEXING ---
+  useEffect(() => {
+    const currentToolObj = TOOLS.find((t) => t.id === activeToolId);
+    if (currentToolObj) {
+      document.title = `${currentToolObj.name} - Free Online Tool | ToolHub`;
+    } else {
+      document.title = "ToolHub - Unified Free Online Tools & Utilities";
+    }
+  }, [activeToolId]);
+
   const selectTool = (id) => {
     setActiveToolId(id);
     setPage('app');
@@ -2332,9 +2342,13 @@ export default function App() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredTools.map((tool) => (
-                    <div
+                    <a
                       key={tool.id}
-                      onClick={() => selectTool(tool.id)}
+                      href={`/?tool=${tool.id}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        selectTool(tool.id);
+                      }}
                       className="group bg-white p-5 rounded-2xl border border-slate-200/80 hover:border-indigo-300 hover:shadow-md transition cursor-pointer relative flex flex-col justify-between"
                     >
                       <div>
@@ -2361,7 +2375,7 @@ export default function App() {
                         <span>Open Tool</span>
                         <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition" />
                       </div>
-                    </div>
+                    </a>
                   ))}
                 </div>
               </div>
